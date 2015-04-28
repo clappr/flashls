@@ -5,10 +5,10 @@ package org.mangui.hls.playlist {
     import flash.events.*;
     import flash.net.*;
     import flash.utils.ByteArray;
+    import flash.utils.Dictionary;
     import flash.utils.getTimer;
     import org.mangui.hls.constant.HLSLoaderTypes;
     import org.mangui.hls.constant.HLSTypes;
-    import org.mangui.hls.event.HLSError;
     import org.mangui.hls.event.HLSEvent;
     import org.mangui.hls.event.HLSLoadMetrics;
     import org.mangui.hls.HLS;
@@ -67,11 +67,12 @@ package org.mangui.hls.playlist {
         private var _metrics : HLSLoadMetrics;
 
         /** Load a playlist M3U8 file. **/
-        public function loadPlaylist(url : String, success : Function, error : Function, index : int, type : String, flushLiveURLcache : Boolean) : void {
+        public function loadPlaylist(hls : HLS, url : String, success : Function, error : Function, index : int, type : String, flushLiveURLcache : Boolean) : void {
             _url = url;
             _success = success;
             _index = index;
-            _urlloader = new URLLoader();
+            var urlLoaderClass : Class = hls.URLloader as Class;
+            _urlloader = (new urlLoaderClass()) as URLLoader;
             _urlloader.addEventListener(Event.COMPLETE, _loadCompleteHandler);
             _urlloader.addEventListener(ProgressEvent.PROGRESS, _loadProgressHandler);
             _urlloader.addEventListener(IOErrorEvent.IO_ERROR, error);
@@ -122,8 +123,7 @@ package org.mangui.hls.playlist {
         /** loading complete handler **/
         private function _loadCompleteHandler(event : Event) : void {
             _metrics.loading_end_time = getTimer();
-            var loader : URLLoader = URLLoader(event.target);
-            onLoadedData(String(loader.data));
+            onLoadedData(String(_urlloader.data));
         };
 
         private function onLoadedData(data : String) : void {
@@ -305,8 +305,9 @@ package org.mangui.hls.playlist {
         };
 
         /** Extract levels from manifest data. **/
-        public static function extractLevels(hls : HLS, data : String, base : String = '') : Vector.<Level> {
-            var levels : Array = [];
+        public static function extractLevels(data : String, base : String = '') : Vector.<Level> {
+            var levels : Vector.<Level> = new Vector.<Level>();
+            var bitrateDictionary : Dictionary = new Dictionary();
             var level : Level;
             var lines : Array = data.split("\n");
             var level_found : Boolean = false;
@@ -324,7 +325,7 @@ package org.mangui.hls.playlist {
                     for (var j : int = 0; j < params.length; j++) {
                         var param : String = params[j];
                         if (param.indexOf('BANDWIDTH') > -1) {
-                            level.bitrate = param.split('=')[1];
+                            level.bitrate = parseInt(param.split('=')[1]);
                         } else if (param.indexOf('RESOLUTION') > -1) {
                             var res : String = param.split('=')[1] as String;
                             var dim : Array = res.split('x');
@@ -348,25 +349,30 @@ package org.mangui.hls.playlist {
                         }
                     }
                 } else if (level_found == true) {
-                    level.url = _extractURL(line, base);
-                    levels.push(level);
+                    if(!(level.bitrate in bitrateDictionary)) {
+                        level.url = _extractURL(line, base);
+                        level.manifest_index = levels.length;
+                        levels.push(level);
+                        bitrateDictionary[level.bitrate] = true;
+                    } else {
+                       CONFIG::LOGGING {
+                            Log.debug("discard failover level with bitrate " + level.bitrate);
+                        }
+                    }
                     level_found = false;
                 }
             }
-            var levelsLength : int = levels.length;
-            if (levelsLength == 0) {
-                var hlsError : HLSError = new HLSError(HLSError.MANIFEST_PARSING_ERROR, base, "No level found in Manifest");
-                hls.dispatchEvent(new HLSEvent(HLSEvent.ERROR, hlsError));
+            levels.sort(compareLevel);
+            for (i = 0; i < levels.length; i++) {
+                levels[i].index = i;
             }
-            levels.sortOn('bitrate', Array.NUMERIC);
-            var vectorLevels : Vector.<Level> = new Vector.<Level>();
-            for (i = 0; i < levelsLength; i++) {
-                level = levels[i];
-                level.index = i;
-                vectorLevels.push(level);
-            }
-            return vectorLevels;
+            return levels;
         };
+
+        /* compare level, smallest bitrate first */
+        private static function compareLevel(x : Level, y : Level) : Number {
+            return (x.bitrate - y.bitrate);
+        }
 
         /** Extract Alternate Audio Tracks from manifest data. **/
         public static function extractAltAudioTracks(data : String, base : String = '') : Vector.<AltAudioTrack> {

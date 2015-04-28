@@ -81,7 +81,7 @@ package org.mangui.hls.loader {
         public function AltAudioFragmentLoader(hls : HLS, streamBuffer : StreamBuffer) : void {
             _hls = hls;
             _streamBuffer = streamBuffer;
-            _timer = new Timer(100, 0);
+            _timer = new Timer(20, 0);
             _timer.addEventListener(TimerEvent.TIMER, _checkLoading);
             _loading_state = LOADING_IDLE;
             _keymap = new Object();
@@ -379,7 +379,7 @@ package org.mangui.hls.loader {
                 bytes.position = bytes.length;
                 bytes.writeBytes(data);
                 data = bytes;
-                _demux = DemuxHelper.probe(data, _level, _hls.stage, _fragParsingAudioSelectionHandler, _fragParsingProgressHandler, _fragParsingCompleteHandler, null);
+                _demux = DemuxHelper.probe(data, _level, _fragParsingAudioSelectionHandler, _fragParsingProgressHandler, _fragParsingCompleteHandler, null);
             }
             if (_demux) {
                 _demux.append(data);
@@ -408,7 +408,7 @@ package org.mangui.hls.loader {
                 var bytes : ByteArray = new ByteArray();
                 fragData.bytes.position = _frag_current.byterange_start_offset;
                 fragData.bytes.readBytes(bytes, 0, _frag_current.byterange_end_offset - _frag_current.byterange_start_offset);
-                _demux = DemuxHelper.probe(bytes, _level, _hls.stage, _fragParsingAudioSelectionHandler, _fragParsingProgressHandler, _fragParsingCompleteHandler, null);
+                _demux = DemuxHelper.probe(bytes, _level, _fragParsingAudioSelectionHandler, _fragParsingProgressHandler, _fragParsingCompleteHandler, null);
                 if (_demux) {
                     bytes.position = 0;
                     _demux.append(bytes);
@@ -546,15 +546,6 @@ package org.mangui.hls.loader {
         private function _loadfragment(frag : Fragment) : void {
             // postpone URLStream init before loading first fragment
             if (_fragstreamloader == null) {
-                if (_hls.stage == null) {
-                    var err : String = "hls.stage not set, cannot parse TS data !!!";
-                    CONFIG::LOGGING {
-                        Log.error(err);
-                    }
-                    var hlsError : HLSError = new HLSError(HLSError.OTHER_ERROR, _frag_current.url, err);
-                    _hls.dispatchEvent(new HLSEvent(HLSEvent.ERROR, hlsError));
-                    return;
-                }
                 var urlStreamClass : Class = _hls.URLstream as Class;
                 _fragstreamloader = (new urlStreamClass()) as URLStream;
                 _fragstreamloader.addEventListener(IOErrorEvent.IO_ERROR, _fragLoadErrorHandler);
@@ -591,7 +582,7 @@ package org.mangui.hls.loader {
                 _hls.dispatchEvent(new HLSEvent(HLSEvent.FRAGMENT_LOADING, frag.url));
                 _fragstreamloader.load(new URLRequest(frag.url));
             } catch (error : Error) {
-                hlsError = new HLSError(HLSError.FRAGMENT_LOADING_ERROR, frag.url, error.message);
+                var hlsError : HLSError = new HLSError(HLSError.FRAGMENT_LOADING_ERROR, frag.url, error.message);
                 _hls.dispatchEvent(new HLSEvent(HLSEvent.ERROR, hlsError));
             }
         }
@@ -653,6 +644,7 @@ package org.mangui.hls.loader {
                     }
                     _streamBuffer.appendTags(HLSLoaderTypes.FRAGMENT_ALTAUDIO,fragData.tags, fragData.tag_pts_min, fragData.tag_pts_max + fragData.tag_duration, _frag_current.continuity, _frag_current.start_time + fragData.tag_pts_start_offset / 1000);
                     _metrics.duration = fragData.pts_max + fragData.tag_duration - fragData.pts_min;
+                    _metrics.id2 = fragData.tags.length;
                     _hls.dispatchEvent(new HLSEvent(HLSEvent.TAGS_LOADED, _metrics));
                     fragData.shiftTags();
                 }
@@ -663,6 +655,8 @@ package org.mangui.hls.loader {
                 hlsError = new HLSError(HLSError.OTHER_ERROR, _frag_current.url, error.message);
                 _hls.dispatchEvent(new HLSEvent(HLSEvent.ERROR, hlsError));
             }
+            // speed up loading of new fragment
+            _timer.start();
         }
     }
 }

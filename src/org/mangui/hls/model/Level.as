@@ -18,11 +18,13 @@ package org.mangui.hls.model {
         /** H264 codec signaled ? **/
         public var codec_h264 : Boolean;
         /** Level Bitrate. **/
-        public var bitrate : Number;
+        public var bitrate : uint;
         /** Level Name. **/
         public var name : String;
-        /** level index **/
+        /** level index (sorted by bitrate) **/
         public var index : int = 0;
+        /** level index (manifest order) **/
+        public var manifest_index : int = 0;
         /** video width (from playlist) **/
         public var width : int;
         /** video height (from playlist) **/

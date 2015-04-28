@@ -12,9 +12,9 @@ package org.mangui.hls.loader {
     import flash.utils.clearTimeout;
     import flash.utils.getTimer;
     import flash.utils.setTimeout;
+    import org.mangui.hls.constant.HLSLoaderTypes;
     import org.mangui.hls.constant.HLSPlayStates;
     import org.mangui.hls.constant.HLSTypes;
-    import org.mangui.hls.constant.HLSLoaderTypes;
     import org.mangui.hls.event.HLSError;
     import org.mangui.hls.event.HLSEvent;
     import org.mangui.hls.event.HLSLoadMetrics;
@@ -66,19 +66,17 @@ package org.mangui.hls.loader {
             _hls.addEventListener(HLSEvent.PLAYBACK_STATE, _stateHandler);
             _hls.addEventListener(HLSEvent.LEVEL_SWITCH, _levelSwitchHandler);
             _levels = new Vector.<Level>();
-            _urlloader = new URLLoader();
-            _urlloader.addEventListener(Event.COMPLETE, _loadCompleteHandler);
-            _urlloader.addEventListener(ProgressEvent.PROGRESS, _loadProgressHandler);
-            _urlloader.addEventListener(IOErrorEvent.IO_ERROR, _errorHandler);
-            _urlloader.addEventListener(SecurityErrorEvent.SECURITY_ERROR, _errorHandler);
         };
 
         public function dispose() : void {
             _close();
-            _urlloader.removeEventListener(Event.COMPLETE, _loadCompleteHandler);
-            _urlloader.removeEventListener(ProgressEvent.PROGRESS, _loadProgressHandler);
-            _urlloader.removeEventListener(IOErrorEvent.IO_ERROR, _errorHandler);
-            _urlloader.removeEventListener(SecurityErrorEvent.SECURITY_ERROR, _errorHandler);
+            if(_urlloader) {
+                _urlloader.removeEventListener(Event.COMPLETE, _loadCompleteHandler);
+                _urlloader.removeEventListener(ProgressEvent.PROGRESS, _loadProgressHandler);
+                _urlloader.removeEventListener(IOErrorEvent.IO_ERROR, _errorHandler);
+                _urlloader.removeEventListener(SecurityErrorEvent.SECURITY_ERROR, _errorHandler);
+                _urlloader = null;
+            }
             _hls.removeEventListener(HLSEvent.PLAYBACK_STATE, _stateHandler);
             _hls.removeEventListener(HLSEvent.LEVEL_SWITCH, _levelSwitchHandler);
         }
@@ -123,6 +121,15 @@ package org.mangui.hls.loader {
 
         /** Load the manifest file. **/
         public function load(url : String) : void {
+            if(!_urlloader) {
+                //_urlloader = new URLLoader();
+                var urlLoaderClass : Class = _hls.URLloader as Class;
+                _urlloader = (new urlLoaderClass()) as URLLoader;
+                _urlloader.addEventListener(Event.COMPLETE, _loadCompleteHandler);
+                _urlloader.addEventListener(ProgressEvent.PROGRESS, _loadProgressHandler);
+                _urlloader.addEventListener(IOErrorEvent.IO_ERROR, _errorHandler);
+                _urlloader.addEventListener(SecurityErrorEvent.SECURITY_ERROR, _errorHandler);
+            }
             _close();
             _closed = false;
             _url = url;
@@ -161,8 +168,7 @@ package org.mangui.hls.loader {
             // successful loading, reset retry counter
             _retry_timeout = 1000;
             _retry_count = 0;
-            var loader : URLLoader = URLLoader(event.target);
-            _parseManifest(String(loader.data));
+            _parseManifest(String(_urlloader.data));
         };
 
         /** parse a playlist **/
@@ -235,11 +241,17 @@ package org.mangui.hls.loader {
                         Log.debug("adaptive playlist:\n" + string);
                     }
                     // adaptative playlist, extract levels from playlist, get them and parse them
-                    _levels = Manifest.extractLevels(_hls, string, _url);
-                    // retrieve start level from helper function
-                    _current_level = _hls.startlevel;
+                    _levels = Manifest.extractLevels(string, _url);
+
+                    var levelsLength : int = _levels.length;
+                    if (levelsLength == 0) {
+                        hlsError = new HLSError(HLSError.MANIFEST_PARSING_ERROR, _url, "No level found in Manifest");
+                        _hls.dispatchEvent(new HLSEvent(HLSEvent.ERROR, hlsError));
+                    }
                     _metrics.parsing_end_time = getTimer();
                     _hls.dispatchEvent(new HLSEvent(HLSEvent.MANIFEST_PARSED, _levels));
+                    // retrieve start level from helper function
+                    _current_level = _hls.startlevel;
                     _loadActiveLevelPlaylist();
                     if (string.indexOf(Manifest.ALTERNATE_AUDIO) > 0) {
                         CONFIG::LOGGING {
@@ -269,7 +281,7 @@ package org.mangui.hls.loader {
             // load active M3U8 playlist only
             _manifest_loading = new Manifest();
             _hls.dispatchEvent(new HLSEvent(HLSEvent.LEVEL_LOADING, _current_level));
-            _manifest_loading.loadPlaylist(_levels[_current_level].url, _parseLevelPlaylist, _errorHandler, _current_level, _type, HLSSettings.flushLiveURLCache);
+            _manifest_loading.loadPlaylist(_hls,_levels[_current_level].url, _parseLevelPlaylist, _errorHandler, _current_level, _type, HLSSettings.flushLiveURLCache);
         };
 
         /** When level switch occurs, assess the need of (re)loading new level playlist **/
