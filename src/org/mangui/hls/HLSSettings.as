@@ -69,7 +69,7 @@ package org.mangui.hls {
          *      0, means no retry, error will be triggered automatically
          *     -1 means infinite retry
          */
-        public static var keyLoadMaxRetry : int = -1;
+        public static var keyLoadMaxRetry : int = 3;
         /** keyLoadMaxRetryTimeout
 
          * Maximum key retry timeout (in milliseconds) in case I/O errors are met.
