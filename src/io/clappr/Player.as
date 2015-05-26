@@ -13,7 +13,7 @@ package io.clappr {
       Security.allowDomain("*");
       Security.allowInsecureDomain("*");
       var playbackId = LoaderInfo(this.root.loaderInfo).parameters.playbackId;
-      ExternalInterface.call("console.log", "FlasHLS Clappr (version: 0.3.0, id: " + playbackId + ")");
+      ExternalInterface.call("console.log", "FlasHLS Clappr (version: 0.3.1 - flashls: 0.4.0.7, id: " + playbackId + ")");
     }
   }
 }
