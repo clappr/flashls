@@ -36,10 +36,14 @@ package org.mangui.hls.utils {
         /** chunk size to avoid blocking **/
         private static const CHUNK_SIZE : uint = 65536;
         private static var _instanceCount : int = 0;
+        /** JS callbacks prefix */
+        protected static var _callbackName : String = 'JSLoaderFragment';
 
         public function JSURLStream() {
             addEventListener(Event.OPEN, onOpen);
+            ExternalInterface.marshallExceptions = true;
             super();
+
             // Connect calls to JS.
             if (ExternalInterface.available) {
                 CONFIG::LOGGING {
@@ -53,6 +57,16 @@ package org.mangui.hls.utils {
                 ExternalInterface.addCallback(_callbackLoaded, this[_callbackLoaded]);
                 ExternalInterface.addCallback(_callbackFailure, this[_callbackFailure]);
                 _instanceCount++;
+            }
+        }
+
+        public static function set externalCallback(callbackName: String) : void {
+            _callbackName = callbackName;
+        }
+
+        protected function _trigger(event : String, ...args) : void {
+            if (ExternalInterface.available) {
+                ExternalInterface.call(_callbackName, event, args);
             }
         }
 
@@ -78,7 +92,7 @@ package org.mangui.hls.utils {
 
         override public function close() : void {
             if (ExternalInterface.available) {
-                ExternalInterface.call("JSLoaderFragment.onRequestAbort",ExternalInterface.objectID);
+                _trigger('abortFragment', ExternalInterface.objectID);
             } else {
                 super.close();
             }
@@ -89,7 +103,7 @@ package org.mangui.hls.utils {
             Log.debug("JSURLStream.load:" + request.url);
             }
             if (ExternalInterface.available) {
-                ExternalInterface.call("JSLoaderFragment.onRequestResource",ExternalInterface.objectID, request.url,_callbackLoaded,_callbackFailure);
+                _trigger('requestFragment', ExternalInterface.objectID, request.url, _callbackLoaded, _callbackFailure);
                 this.dispatchEvent(new Event(Event.OPEN));
             } else {
                 super.load(request);
@@ -117,7 +131,9 @@ package org.mangui.hls.utils {
             CONFIG::LOGGING {
             Log.debug("resourceLoadingError");
             }
-            _timer.stop();
+            if(_timer) {
+                _timer.stop();
+            }
             this.dispatchEvent(new IOErrorEvent(IOErrorEvent.IO_ERROR));
         }
 
