@@ -5,6 +5,7 @@ package io.clappr {
   import flash.display.LoaderInfo;
   import flash.external.ExternalInterface;
   import flash.system.Security;
+  import org.mangui.hls.HLSSettings;
 
   public class Player extends ChromelessPlayer {
 
@@ -12,8 +13,13 @@ package io.clappr {
       super();
       Security.allowDomain("*");
       Security.allowInsecureDomain("*");
-      var playbackId = LoaderInfo(this.root.loaderInfo).parameters.playbackId;
-      ExternalInterface.call("console.log", "FlasHLS Clappr (version: 0.4.0 - flashls: 0.4.1.0, id: " + playbackId + ")");
+      ExternalInterface.addCallback("playerSetLogInfo", _setLogInfo);
+      var playbackId : String = LoaderInfo(this.root.loaderInfo).parameters.playbackId;
+      ExternalInterface.call("console.log", "FlasHLS Clappr (version: 0.4.1 - flashls: 0.4.1.0, id: " + playbackId + ")");
+    }
+
+    private function _setLogInfo(logInfo: Boolean) : void {
+      HLSSettings.logInfo = logInfo;
     }
   }
 }
