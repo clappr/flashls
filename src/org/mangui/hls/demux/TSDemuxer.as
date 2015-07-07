@@ -31,10 +31,12 @@ package org.mangui.hls.demux {
         private static const PAT_ID : int = 0;
         /** Packet ID of the SDT (is always 17). **/
         private static const SDT_ID : int = 17;
+        /** Null Packet PID **/
+        private static const NULL_PID : int = 0x1fff;
         /** has PMT been parsed ? **/
         private var _pmtParsed : Boolean;
-        /** any TS packets before PMT ? **/
-        private var _packetsBeforePMT : Boolean;
+        /** any unknown PID found ? **/
+        private var _unknownPIDFound : Boolean;
         /** PMT PID **/
         private var _pmtId : int;
         /** video PID **/
@@ -73,6 +75,7 @@ package org.mangui.hls.demux {
         private var _timer : Timer;
         private var _totalBytes : uint;
         private var _audioOnly : Boolean;
+        private var _audioSelected : Boolean;
 
         public static function probe(data : ByteArray) : Boolean {
             var pos : uint = data.position;
@@ -108,12 +111,13 @@ package org.mangui.hls.demux {
             _callback_complete = callback_complete;
             _callback_videometadata = callback_videometadata;
             _pmtParsed = false;
-            _packetsBeforePMT = false;
+            _unknownPIDFound = false;
             _pmtId = _avcId = _audioId = _id3Id = -1;
             _audioIsAAC = false;
             _tags = new Vector.<FLVTag>();
             _timer = new Timer(0, 0);
             _audioOnly = audioOnly;
+            _audioSelected = true;
         };
 
         /** append new TS data */
@@ -444,7 +448,7 @@ package org.mangui.hls.demux {
                     _curNalUnit = new ByteArray();
                     _curVideoTag = new FLVTag(FLVTag.AVC_NALU, pes.pts, pes.dts, false);
                     // push NAL unit 9 into TAG
-                    _curVideoTag.push(pes.data, frame.start, frame.length);
+                    _curVideoTag.push(Nalu.AUD, 0, 2);
                 } else if (frame.type == 7) {
                     sps_found = true;
                     sps = new ByteArray();
@@ -487,6 +491,11 @@ package org.mangui.hls.demux {
             for each (frame in frames) {
                 if (frame.type <= 6) {
                     if (_curNalUnit && _curNalUnit.length) {
+                        if(!_curVideoTag) {
+                            // in case AUD unit is missing ...
+                            _curVideoTag = new FLVTag(FLVTag.AVC_NALU, pes.pts, pes.dts, false);
+                            _curVideoTag.push(Nalu.AUD, 0, 2);
+                        }
                         _curVideoTag.push(_curNalUnit, 0, _curNalUnit.length);
                     }
                     _curNalUnit = new ByteArray();
@@ -510,7 +519,7 @@ package org.mangui.hls.demux {
                             var type : uint = eg.readUE();
                             if (type == 2 || type == 4 || type == 7 || type == 9) {
                                 CONFIG::LOGGING {
-                                    Log.debug("TS: frame_type:" + frame.type + ",keyframe slice_type:" + type);
+                                    Log.debug2("TS: frame_type:" + frame.type + ",keyframe slice_type:" + type);
                                 }
                                 _curVideoTag.keyframe = true;
                             }
@@ -642,7 +651,7 @@ package org.mangui.hls.demux {
                     }
                     break;
                 case _pmtId:
-                    if (_pmtParsed == false || _packetsBeforePMT == true) {
+                    if (_pmtParsed == false || _unknownPIDFound == true) {
                         CONFIG::LOGGING {
                             if(_pmtParsed == false) {
                                 Log.debug("TS: PMT found");
@@ -654,12 +663,13 @@ package org.mangui.hls.demux {
                         // if PMT was not parsed before, and some unknown packets have been skipped in between,
                         // rewind to beginning of the stream, it helps recovering bad segmented content
                         // in theory there should be no A/V packets before PAT/PMT)
-                        if (_pmtParsed == false && _packetsBeforePMT == true) {
+                        if (_pmtParsed == false && _unknownPIDFound == true) {
                             CONFIG::LOGGING {
                                 Log.warn("TS: late PMT found, rewinding at beginning of TS");
                             }
                             _pmtParsed = true;
                             _readPosition = 0;
+                            _unknownPIDFound = false;
                             return;
                         }
                         _pmtParsed = true;
@@ -742,9 +752,17 @@ package org.mangui.hls.demux {
                     }
                     break;
                 case SDT_ID:
+                case NULL_PID:
                     break;
                 default:
-                    _packetsBeforePMT = true;
+                /* check for unknown PID :
+                    video PID not defined and stream is not audio only OR
+                    audio PID not defined and audio selected
+                    adding this condition is useful to avoid reporting unknown PIDs for streams with multiple audio PIDs for example ...
+                */
+                    if((_avcId ==-1 && !_audioOnly) || (_audioId ==-1 && _audioSelected)) {
+                        _unknownPIDFound = true;
+                    }
                     break;
             }
             // Jump to the next packet.
@@ -845,11 +863,13 @@ package org.mangui.hls.demux {
             if (audioTrack) {
                 audioPID = audioTrack.id;
                 _audioIsAAC = audioTrack.isAAC;
+                _audioSelected = true;
                 CONFIG::LOGGING {
                     Log.debug("TS: selected " + (_audioIsAAC ? "AAC" : "MP3") + " PID: " + audioPID);
                 }
             } else {
                 audioPID = -1;
+                _audioSelected = false;
                 CONFIG::LOGGING {
                     Log.debug("TS: no audio selected");
                 }

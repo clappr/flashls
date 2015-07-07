@@ -11,84 +11,118 @@
 
     /** Constants and utilities for the H264 video format. **/
     public class Nalu {
-        /** H264 NAL unit names. **/
-        private static const NAMES : Array = ['Unspecified',                  // 0
-        'NDR',                          // 1
-        'Partition A',                  // 2
-        'Partition B',                  // 3
-        'Partition C',                  // 4
-        'IDR',                          // 5
-        'SEI',                          // 6
-        'SPS',                          // 7
-        'PPS',                          // 8
-        'AUD',                          // 9
-        'End of Sequence',              // 10
-        'End of Stream',                // 11
-        'Filler Data'// 12
-        ];
+
+        private static var _audNalu : ByteArray;
+        // static initializer
+        {
+            _audNalu = new ByteArray();
+            _audNalu.length = 2;
+            _audNalu.writeByte(0x09);
+            _audNalu.writeByte(0xF0);
+        };
+
 
         /** Return an array with NAL delimiter indexes. **/
         public static function getNALU(nalu : ByteArray, position : uint) : Vector.<VideoFrame> {
+            var len : uint = nalu.length,i : uint = position;
+            var unitHeader : int,lastUnitHeader : int = 0;
+            var unitStart : int,lastUnitStart : int = 0;
+            var unitType : int,lastUnitType : int = 0;
+            var audFound : Boolean = false;
+            var value : uint,state : uint = 0;
             var units : Vector.<VideoFrame> = new Vector.<VideoFrame>();
-            var unit_start : int;
-            var unit_type : int;
-            var unit_header : int;
             // Loop through data to find NAL startcodes.
-            var window : uint = 0;
-            nalu.position = position;
-            while (nalu.bytesAvailable > 4) {
-                window = nalu.readUnsignedInt();
-                // Match four-byte startcodes
-                if ((window & 0xFFFFFFFF) == 0x01) {
-                    // push previous NAL unit if new start delimiter found, dont push unit with type = 0
-                    if (unit_start && unit_type) {
-                        units.push(new VideoFrame(unit_header, nalu.position - 4 - unit_start, unit_start, unit_type));
-                    }
-                    unit_header = 4;
-                    unit_start = nalu.position;
-                    unit_type = nalu.readByte() & 0x1F;
-                    // NDR or IDR NAL unit
-                    if (unit_type == 1 || unit_type == 5) {
+            while (i < len) {
+                // finding 3 or 4-byte start codes (00 00 01 OR 00 00 00 01)
+                value = nalu[i++];
+                switch(state)
+                {
+                    case 0:
+                        if(!value) {
+                            state = 1;
+                            // unitHeader is NAL header offset
+                            unitHeader=i-1;
+                        }
                         break;
-                    }
-                    // Match three-byte startcodes
-                } else if ((window & 0xFFFFFF00) == 0x100) {
-                    // push previous NAL unit if new start delimiter found, dont push unit with type = 0
-                    if (unit_start && unit_type) {
-                        units.push(new VideoFrame(unit_header, nalu.position - 4 - unit_start, unit_start, unit_type));
-                    }
-                    nalu.position--;
-                    unit_header = 3;
-                    unit_start = nalu.position;
-                    unit_type = nalu.readByte() & 0x1F;
-                    // NDR or IDR NAL unit
-                    if (unit_type == 1 || unit_type == 5) {
+                    case 1:
+                        if(value) {
+                            state = 0;
+                        } else {
+                            state = 2;
+                        }
                         break;
-                    }
-                } else {
-                    nalu.position -= 3;
+                    case 2:
+                    case 3:
+                        if(value) {
+                            if(value === 1) {
+                                unitType = nalu[i] & 0x1f;
+                                if(unitType == 9) {
+                                    audFound = true;
+                                }
+                                if(lastUnitStart) {
+                                    // use Math.min(4,...) as max header size is 4.
+                                    // in case there are any leading zeros
+                                    // such as 00 00 00 00 00 00 01
+                                    //                  ^^
+                                    // we need to ignore them as they are part of previous NAL unit
+                                    units.push(new VideoFrame(Math.min(4,lastUnitStart-lastUnitHeader), i-state-1-lastUnitStart, lastUnitStart, lastUnitType));
+                                }
+                                lastUnitStart = i;
+                                lastUnitType = unitType;
+                                lastUnitHeader = unitHeader;
+                                if(audFound == true && (unitType === 1 || unitType === 5)) {
+                                  // OPTI !!! if AUD unit already parsed and if IDR/NDR unit, consider it is last NALu
+                                  i = len;
+                                }
+                            }
+                            state = 0;
+                        } else {
+                            state = 3;
+                        }
+                        break;
+                    default:
+                        break;
                 }
             }
-            // Append the last NAL to the array.
-            if (unit_start) {
-                units.push(new VideoFrame(unit_header, nalu.length - unit_start, unit_start, unit_type));
+            //push last unit
+            if(lastUnitStart) {
+                units.push(new VideoFrame(Math.min(4,lastUnitStart-lastUnitHeader), len-lastUnitStart, lastUnitStart, lastUnitType));
             }
             // Reset position and return results.
             CONFIG::LOGGING {
-            if (HLSSettings.logDebug2) {
-                if (units.length) {
-                    var txt : String = "AVC: ";
-                    for (var i : int = 0; i < units.length; i++) {
-                        txt += NAMES[units[i].type] + ", ";
+                if (HLSSettings.logDebug2) {
+                    /** H264 NAL unit names. **/
+                    const NAMES : Array = ['Unspecified',// 0
+                    'NDR',                          // 1
+                    'Partition A',                  // 2
+                    'Partition B',                  // 3
+                    'Partition C',                  // 4
+                    'IDR',                          // 5
+                    'SEI',                          // 6
+                    'SPS',                          // 7
+                    'PPS',                          // 8
+                    'AUD',                          // 9
+                    'End of Sequence',              // 10
+                    'End of Stream',                // 11
+                    'Filler Data'// 12
+                    ];
+                    if (units.length) {
+                        var txt : String = "AVC: ";
+                        for (i = 0; i < units.length; i++) {
+                            txt += NAMES[units[i].type] + ","; //+ ":" + units[i].length
+                        }
+                        Log.debug2(txt.substr(0,txt.length-1) + " slices");
+                    } else {
+                        Log.debug2('AVC: no NALU slices found');
                     }
-                    Log.debug2(txt.substr(0, txt.length - 2) + " slices");
-                } else {
-                    Log.debug2('AVC: no NALU slices found');
                 }
-            }
             }
             nalu.position = position;
             return units;
         };
+
+        public static function get AUD():ByteArray {
+            return _audNalu;
+        }
     }
 }

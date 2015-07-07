@@ -11,7 +11,8 @@ package org.mangui.hls.stream {
     import org.mangui.hls.flv.FLVTag;
     import org.mangui.hls.HLS;
     import org.mangui.hls.HLSSettings;
-    import org.mangui.hls.utils.Hex;
+
+    import by.blooddy.crypto.Base64;
 
     import flash.events.Event;
     import flash.events.NetStatusEvent;
@@ -69,7 +70,7 @@ package org.mangui.hls.stream {
             _client.registerCallback("onHLSFragmentSkipped", onHLSFragmentSkipped);
             _client.registerCallback("onID3Data", onID3Data);
             super.client = _client;
-        };
+        }
 
         public function onHLSFragmentChange(level : int, seqnum : int, cc : int, duration : Number, audio_only : Boolean, program_date : Number, width : int, height : int, auto_level : Boolean, ... tags) : void {
             CONFIG::LOGGING {
@@ -96,10 +97,9 @@ package org.mangui.hls.stream {
 
         // function is called by SCRIPT in FLV
         public function onID3Data(data : ByteArray) : void {
-            // we dump the content as hex to get it to the Javascript in the browser.
-            // from lots of searching, we could use base64, but even then, the decode would
-            // not be native, so hex actually seems more efficient
-            var dump : String = Hex.fromArray(data);
+            // we dump the content as base64 to get it to the Javascript in the browser.
+            // The client can use window.atob() to decode the ID3Data.
+            var dump : String = Base64.encode(data);
             CONFIG::LOGGING {
                 Log.debug("id3:" + dump);
             }
@@ -114,19 +114,30 @@ package org.mangui.hls.stream {
             if (_seekState != HLSSeekStates.SEEKING) {
                 // check low buffer condition
                 if (buffer <= 0.1) {
-                    if (_streamBuffer.reachedEnd) {
+                    if (_streamBuffer.reachedEnd || _streamBuffer.liveLoadingStalled) {
                         // Last tag done? Then append sequence end.
                         super.appendBytesAction(NetStreamAppendBytesAction.END_SEQUENCE);
                         super.appendBytes(new ByteArray());
                         // reach end of playlist + playback complete (as buffer is empty).
                         // stop timer, report event and switch to IDLE mode.
-                        _timer.stop();
-                        CONFIG::LOGGING {
-                            Log.debug("reached end of VOD playlist, notify playback complete");
+                        if(_streamBuffer.reachedEnd) {
+                            _timer.stop();
+                            CONFIG::LOGGING {
+                                Log.debug("reached end of VOD playlist, notify playback complete");
+                            }
+                            _hls.dispatchEvent(new HLSEvent(HLSEvent.PLAYBACK_COMPLETE));
+                            _setPlaybackState(HLSPlayStates.IDLE);
+                            _setSeekState(HLSSeekStates.IDLE);
+                        } else {
+                            // flush buffer and restart playback in case live loading stalled
+                            CONFIG::LOGGING {
+                                Log.warn("loading stalled: restart playback");
+                            }
+                            // flush whole buffer before seeking
+                            _streamBuffer.flushBuffer();
+                            /* seek to force a restart of the playback session  */
+                            seek(-1);
                         }
-                        _hls.dispatchEvent(new HLSEvent(HLSEvent.PLAYBACK_COMPLETE));
-                        _setPlaybackState(HLSPlayStates.IDLE);
-                        _setSeekState(HLSSeekStates.IDLE);
                         return;
                     } else {
                         // buffer <= 0.1 and not EOS, pause playback
@@ -134,7 +145,7 @@ package org.mangui.hls.stream {
                     }
                 }
                 // if buffer len is below lowBufferLength, get into buffering state
-                if (!_streamBuffer.reachedEnd && buffer < _bufferThresholdController.lowBufferLength) {
+                if (!_streamBuffer.reachedEnd && !_streamBuffer.liveLoadingStalled && buffer < _bufferThresholdController.lowBufferLength) {
                     if (_playbackState == HLSPlayStates.PLAYING) {
                         // low buffer condition and play state. switch to play buffering state
                         _setPlaybackState(HLSPlayStates.PLAYING_BUFFERING);
@@ -144,7 +155,7 @@ package org.mangui.hls.stream {
                     }
                 }
                 // if buffer len is above minBufferLength, get out of buffering state
-                if (buffer >= _bufferThresholdController.minBufferLength || _streamBuffer.reachedEnd) {
+                if (buffer >= _bufferThresholdController.minBufferLength || _streamBuffer.reachedEnd || _streamBuffer.liveLoadingStalled) {
                     if (_playbackState == HLSPlayStates.PLAYING_BUFFERING) {
                         CONFIG::LOGGING {
                             Log.debug("resume playback");
@@ -157,22 +168,22 @@ package org.mangui.hls.stream {
                     }
                 }
             }
-        };
+        }
 
         /** Return the current playback state. **/
         public function get playbackState() : String {
             return _playbackState;
-        };
+        }
 
         /** Return the current seek state. **/
         public function get seekState() : String {
             return _seekState;
-        };
+        }
 
         /** Return the current playback quality level **/
         public function get currentLevel() : int {
             return _currentLevel;
-        };
+        }
 
         /** append tags to NetStream **/
         public function appendTags(tags : Vector.<FLVTag>) : void {
@@ -214,7 +225,7 @@ package org.mangui.hls.stream {
                 dispatchEvent(new NetStatusEvent(NetStatusEvent.NET_STATUS, false, false, {code:"NetStream.Seek.Notify", level:"status"}));
                 _setSeekState(HLSSeekStates.SEEKED);
             }
-        };
+        }
 
         /** Change playback state. **/
         private function _setPlaybackState(state : String) : void {
@@ -225,7 +236,7 @@ package org.mangui.hls.stream {
                 _playbackState = state;
                 _hls.dispatchEvent(new HLSEvent(HLSEvent.PLAYBACK_STATE, _playbackState));
             }
-        };
+        }
 
         /** Change seeking state. **/
         private function _setSeekState(state : String) : void {
@@ -236,7 +247,7 @@ package org.mangui.hls.stream {
                 _seekState = state;
                 _hls.dispatchEvent(new HLSEvent(HLSEvent.SEEK_STATE, _seekState));
             }
-        };
+        }
 
         /* also include skipped duration in get time() so that play position will match fragment position */
         override public function get time() : Number {
@@ -277,7 +288,7 @@ package org.mangui.hls.stream {
                 super.pause();
                 _setPlaybackState(HLSPlayStates.PAUSED_BUFFERING);
             }
-        };
+        }
 
         /** Resume playback. **/
         override public function resume() : void {
@@ -291,17 +302,17 @@ package org.mangui.hls.stream {
                 // dont resume NetStream here, it will be resumed by Timer. this avoids resuming playback while seeking is in progress
                 _setPlaybackState(HLSPlayStates.PLAYING_BUFFERING);
             }
-        };
+        }
 
         /** get Buffer Length  **/
         override public function get bufferLength() : Number {
             return netStreamBufferLength + _streamBuffer.bufferLength;
-        };
+        }
 
         /** get Back Buffer Length  **/
         override public function get backBufferLength() : Number {
             return _streamBuffer.backBufferLength;
-        };
+        }
 
         public function get netStreamBufferLength() : Number {
             if (_seekState == HLSSeekStates.SEEKING) {
@@ -309,7 +320,7 @@ package org.mangui.hls.stream {
             } else {
                 return super.bufferLength;
             }
-        };
+        }
 
         /** Start playing data in the buffer. **/
         override public function seek(position : Number) : void {
@@ -340,11 +351,11 @@ package org.mangui.hls.stream {
              */
             super.pause();
             _timer.start();
-        };
+        }
 
         public override function set client(client : Object) : void {
             _client.delegate = client;
-        };
+        }
 
         public override function get client() : Object {
             return _client.delegate;
@@ -360,7 +371,7 @@ package org.mangui.hls.stream {
             _timer.stop();
             _setPlaybackState(HLSPlayStates.IDLE);
             _setSeekState(HLSSeekStates.IDLE);
-        };
+        }
 
         public function dispose_() : void {
             close();

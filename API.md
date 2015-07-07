@@ -116,16 +116,19 @@ get : return quality level used to load first fragment after a seek operation
 
 #### hls.currentLevel
 get : return current playback quality level
+
 set : trigger an immediate quality level switch to new quality level. this will pause the video if it was playing, flush the whole buffer, and fetch fragment matching with current position and requested quality level. then resume the video if needed once fetched fragment will have been buffered.
 set to -1 for automatic level selection
 
 #### hls.nextLevel
 get : return next playback quality level (playback quality level for next buffered fragment). return -1 if next fragment not buffered yet
+
 set : trigger a quality level switch for next fragment. this could eventually flush already buffered next fragment
 set to -1 for automatic level selection
 
 #### hls.loadLevel
 get : return last loaded fragment quality level.
+
 set : set quality level for next loaded fragment
 set to -1 for automatic level selection
 
@@ -233,3 +236,11 @@ full list of Events is described below :
   	-  data: { duration : new duration}
   - `HLSEvent.ID3_UPDATED` - triggered when new ID3 tag is available (fired during playback at the right playback timestamp)
   	-  data: { ID3Data : Hex String of ID3 representation }
+  - `HLSEvent.STAGE_SET` - triggered when Stage object has been attached to hls instance
+    -  data: none
+  - `HLSEvent.FPS_DROP` - triggered when FPS drop in last monitoring period is higher than given threshold
+    -  data: { level : current playback quality level}
+  - `HLSEvent.FPS_DROP_LEVEL_CAPPING` - triggered when FPS drop triggers auto level capping
+    -  data: { level : max autolevel }
+  - `HLSEvent.FPS_DROP_SMOOTH_LEVEL_SWITCH` - triggered when FPS drop triggers a smooth auto level down switching
+    -  data: none
