@@ -13,6 +13,7 @@ package org.mangui.chromeless {
     import flash.net.URLLoader;
     import flash.net.URLStream;
     import flash.system.Security;
+    import flash.utils.getTimer;
     import flash.utils.setTimeout;
     import org.mangui.hls.event.HLSError;
     import org.mangui.hls.event.HLSEvent;
@@ -20,6 +21,7 @@ package org.mangui.chromeless {
     import org.mangui.hls.HLSSettings;
     import org.mangui.hls.model.AudioTrack;
     import org.mangui.hls.model.Level;
+    import org.mangui.hls.model.Stats;
     import org.mangui.hls.utils.JSURLLoader;
     import org.mangui.hls.utils.JSURLStream;
     import org.mangui.hls.utils.Log;
@@ -89,6 +91,7 @@ package org.mangui.chromeless {
             ExternalInterface.addCallback("getPlayerVersion", _getPlayerVersion);
             ExternalInterface.addCallback("getAudioTrackList", _getAudioTrackList);
             ExternalInterface.addCallback("getAudioTrackId", _getAudioTrackId);
+            ExternalInterface.addCallback("getStats", _getStats);
         };
 
         protected function _setupExternalCallers() : void {
@@ -149,7 +152,7 @@ package org.mangui.chromeless {
 
         /** Notify javascript the framework is ready. **/
         protected function _pingJavascript() : void {
-            _trigger("ready");
+            _trigger("ready", getTimer());
         };
 
         /** Forward events from the framework. **/
@@ -347,6 +350,10 @@ package org.mangui.chromeless {
 
         protected function _getAudioTrackId() : int {
             return _hls.audioTrack;
+        };
+
+        protected function _getStats() : Stats {
+            return _hls.stats;
         };
 
         /** Javascript calls. **/

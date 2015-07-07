@@ -49,12 +49,15 @@ package org.mangui.hls.stream {
         private var _currentLevel : int;
         /** Netstream client proxy */
         private var _client : HLSNetStreamClient;
+        /** skipped fragment duration **/
+        private var _skippedDuration : Number;
 
         /** Create the buffer. **/
         public function HLSNetStream(connection : NetConnection, hls : HLS, streamBuffer : StreamBuffer) : void {
             super(connection);
             super.bufferTime = 0.1;
             _hls = hls;
+            _skippedDuration = 0;
             _bufferThresholdController = new BufferThresholdController(hls);
             _streamBuffer = streamBuffer;
             _playbackState = HLSPlayStates.IDLE;
@@ -63,11 +66,12 @@ package org.mangui.hls.stream {
             _timer.addEventListener(TimerEvent.TIMER, _checkBuffer);
             _client = new HLSNetStreamClient();
             _client.registerCallback("onHLSFragmentChange", onHLSFragmentChange);
+            _client.registerCallback("onHLSFragmentSkipped", onHLSFragmentSkipped);
             _client.registerCallback("onID3Data", onID3Data);
             super.client = _client;
         };
 
-        public function onHLSFragmentChange(level : int, seqnum : int, cc : int, duration : Number, audio_only : Boolean, program_date : Number, width : int, height : int, ... tags) : void {
+        public function onHLSFragmentChange(level : int, seqnum : int, cc : int, duration : Number, audio_only : Boolean, program_date : Number, width : int, height : int, auto_level : Boolean, ... tags) : void {
             CONFIG::LOGGING {
                 Log.debug("playing fragment(level/sn/cc):" + level + "/" + seqnum + "/" + cc);
             }
@@ -79,7 +83,15 @@ package org.mangui.hls.stream {
                     Log.debug("custom tag:" + tags[i]);
                 }
             }
-            _hls.dispatchEvent(new HLSEvent(HLSEvent.FRAGMENT_PLAYING, new HLSPlayMetrics(level, seqnum, cc, duration, audio_only, program_date, width, height, tag_list)));
+            _hls.dispatchEvent(new HLSEvent(HLSEvent.FRAGMENT_PLAYING, new HLSPlayMetrics(level, seqnum, cc, duration, audio_only, program_date, width, height, auto_level, tag_list)));
+        }
+
+
+        public function onHLSFragmentSkipped(level : int, seqnum : int,duration : Number) : void {
+            CONFIG::LOGGING {
+                Log.warn("skipped fragment(level/sn/duration):" + level + "/" + seqnum + "/" + duration);
+            }
+            _skippedDuration+=duration;
         }
 
         // function is called by SCRIPT in FLV
@@ -169,6 +181,7 @@ package org.mangui.hls.stream {
                 let's flush netstream now
                 this is to avoid black screen during seek command */
                 super.close();
+                _skippedDuration = 0;
                 CONFIG::FLASH_11_1 {
                     try {
                         super.useHardwareDecoder = HLSSettings.useHardwareVideoDecoder;
@@ -179,15 +192,12 @@ package org.mangui.hls.stream {
                 super.appendBytesAction(NetStreamAppendBytesAction.RESET_SEEK);
                 // immediatly pause NetStream, it will be resumed when enough data will be buffered in the NetStream
                 super.pause();
-
-//                for each (var tag : FLVTag in tags) {
-//                    CONFIG::LOGGING {
-//                        Log.debug2('inject type/dts/pts:' + tag.typeString + '/' + tag.dts + '/' + tag.pts);
-//                    }
-//                }
             }
             // append all tags
             for each (var tagBuffer : FLVTag in tags) {
+                // CONFIG::LOGGING {
+                //     Log.debug2('inject type/dts/pts:' + tagBuffer.typeString + '/' + tagBuffer.dts + '/' + tagBuffer.pts);
+                // }
                 try {
                     if (tagBuffer.type == FLVTag.DISCONTINUITY) {
                         super.appendBytesAction(NetStreamAppendBytesAction.RESET_BEGIN);
@@ -227,6 +237,11 @@ package org.mangui.hls.stream {
                 _hls.dispatchEvent(new HLSEvent(HLSEvent.SEEK_STATE, _seekState));
             }
         };
+
+        /* also include skipped duration in get time() so that play position will match fragment position */
+        override public function get time() : Number {
+            return super.time+_skippedDuration;
+        }
 
         override public function play(...args) : void {
             var _playStart : Number;

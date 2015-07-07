@@ -2,8 +2,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 package org.mangui.hls.loader {
-    import flash.utils.getTimer;
 
+    import flash.events.*;
+    import flash.net.*;
+    import flash.utils.ByteArray;
+    import flash.utils.getTimer;
+    import flash.utils.Timer;
     import org.mangui.hls.constant.HLSLoaderTypes;
     import org.mangui.hls.constant.HLSTypes;
     import org.mangui.hls.demux.Demuxer;
@@ -20,11 +24,6 @@ package org.mangui.hls.loader {
     import org.mangui.hls.model.Level;
     import org.mangui.hls.stream.StreamBuffer;
     import org.mangui.hls.utils.AES;
-
-    import flash.events.*;
-    import flash.net.*;
-    import flash.utils.ByteArray;
-    import flash.utils.Timer;
 
     CONFIG::LOGGING {
         import org.mangui.hls.utils.Log;
@@ -71,6 +70,7 @@ package org.mangui.hls.loader {
         private var _loadingState : int;
         /* loading metrics */
         private var _metrics : HLSLoadMetrics;
+        private static const LOADING_STOPPED : int = -1;
         private static const LOADING_IDLE : int = 0;
         private static const LOADING_IN_PROGRESS : int = 1;
         private static const LOADING_WAITING_LEVEL_UPDATE : int = 2;
@@ -85,13 +85,13 @@ package org.mangui.hls.loader {
             _streamBuffer = streamBuffer;
             _timer = new Timer(20, 0);
             _timer.addEventListener(TimerEvent.TIMER, _checkLoading);
-            _loadingState = LOADING_IDLE;
+            _loadingState = LOADING_STOPPED;
             _keymap = new Object();
         };
 
         public function dispose() : void {
             stop();
-            _loadingState = LOADING_IDLE;
+            _loadingState = LOADING_STOPPED;
             _keymap = new Object();
         }
 
@@ -108,6 +108,8 @@ package org.mangui.hls.loader {
         /**  fragment loading Timer **/
         private function _checkLoading(e : Event) : void {
             switch(_loadingState) {
+                // nothing to load
+                case LOADING_STOPPED:
                 // nothing to load until level is retrieved
                 case LOADING_WAITING_LEVEL_UPDATE:
                 // loading already in progress
@@ -138,8 +140,10 @@ package org.mangui.hls.loader {
                     - if bandwidth available is lower than lowest quality needed bandwidth
                     - after long pause */
                     CONFIG::LOGGING {
-                        Log.warn("audio loading stalled: restart playback???");
+                        Log.warn("audio loading stalled: restart playback");
                     }
+                    // flush whole buffer before seeking
+                    _streamBuffer.flushBuffer();
                     /* seek to force a restart of the playback session  */
                     _hls.stream.seek(-1);
                     break;
@@ -272,13 +276,29 @@ package org.mangui.hls.loader {
                 _fragRetryTimeout = Math.min(HLSSettings.fragmentLoadMaxRetryTimeout, 2 * _fragRetryTimeout);
             } else {
                 if(HLSSettings.fragmentLoadSkipAfterMaxRetry == true) {
-                    CONFIG::LOGGING {
-                        Log.warn("max fragment load retry reached, skip fragment and load next one");
+                    /* check if loaded fragment is not the last one of a live playlist.
+                        if it is the case, don't skip to next, as there is no next fragment :-)
+                    */
+                    if(_hls.type == HLSTypes.LIVE && _fragCurrent.seqnum == _level.end_seqnum) {
+                        _loadingState = LOADING_FRAGMENT_IO_ERROR;
+                        _fragLoadErrorDate = getTimer() + _fragRetryTimeout;
+                        CONFIG::LOGGING {
+                            Log.warn("max load retry reached on last fragment of live playlist, retrying loading this one...");
+                        }
+                        /* exponential increase of retry timeout, capped to fragmentLoadMaxRetryTimeout */
+                        _fragRetryCount++;
+                        _fragRetryTimeout = Math.min(HLSSettings.fragmentLoadMaxRetryTimeout, 2 * _fragRetryTimeout);
+                    } else {
+                        CONFIG::LOGGING {
+                            Log.warn("max fragment load retry reached, skip fragment and load next one");
+                        }
+                        _fragRetryCount = 0;
+                        _fragRetryTimeout = 1000;
+                        _fragPrevious = _fragCurrent;
+                        // set fragment first loaded to be true to ensure that we can skip first fragment as well
+                        _fragmentFirstLoaded = true;
+                        _loadingState = LOADING_IDLE;
                     }
-                    _fragPrevious = _fragCurrent;
-                    // set fragment first loaded to be true to ensure that we can skip first fragment as well
-                    _fragmentFirstLoaded = true;
-                    _loadingState = LOADING_IDLE;
                 } else {
                     var hlsError : HLSError = new HLSError(HLSError.FRAGMENT_LOADING_ERROR, _fragCurrent.url, "I/O Error :" + message);
                     _hls.dispatchEvent(new HLSEvent(HLSEvent.ERROR, hlsError));
@@ -442,7 +462,7 @@ package org.mangui.hls.loader {
             _stop_load();
             _hls.removeEventListener(HLSEvent.AUDIO_LEVEL_LOADED, _audioLevelLoadedHandler);
             _timer.stop();
-            _loadingState = LOADING_IDLE;
+            _loadingState = LOADING_STOPPED;
         }
 
         private function _stop_load() : void {
@@ -572,6 +592,7 @@ package org.mangui.hls.loader {
             _metrics.id = frag.seqnum;
             _metrics.loading_request_time = getTimer();
             _fragCurrent = frag;
+            frag.data.auto_level = false;
             if (frag.decrypt_url != null) {
                 if (_keymap[frag.decrypt_url] == undefined) {
                     // load key
@@ -615,7 +636,7 @@ package org.mangui.hls.loader {
                 }
                 fragData.metadata_tag_injected = true;
             }
-            // provide tags to HLSNetStream
+            // provide tags to StreamBuffer
             _streamBuffer.appendTags(HLSLoaderTypes.FRAGMENT_ALTAUDIO,_fragCurrent.level,_fragCurrent.seqnum ,fragData.tags, fragData.tag_pts_min, fragData.tag_pts_max + fragData.tag_duration, _fragCurrent.continuity, _fragCurrent.start_time + fragData.tag_pts_start_offset / 1000);
             fragData.shiftTags();
         }

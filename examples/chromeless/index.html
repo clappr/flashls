@@ -66,7 +66,9 @@ var Y_USEHWDECODER = 3;
 <script type="text/javascript" src="../libs/canvas.js"></script>
 <script type="text/javascript" src="../libs/metrics.js"></script>
 <script type="text/javascript" src="../libs/jsonpack.js"></script>
-
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css">
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap-theme.min.css">
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/js/bootstrap.min.js"></script>
 <style type="text/css">
 a:link {
   color: blue;
@@ -76,11 +78,6 @@ a:visited {
 }
 </style>
 </head>
-
-<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css">
-<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap-theme.min.css">
-<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/js/bootstrap.min.js"></script>
-
 <body style="color: black; background-color: white;">
 
 <big style="font-weight: bold;"><big><code>flashls - Chromeless HLS Flash player</code></big></big><br>
@@ -217,6 +214,8 @@ cap level: <div id="levelCappingControl" style="display: inline;"></div>
   </table>
 
 <h3 class="title">real time metrics</h1>
+    <button type="button" class="btn btn-xs btn-success" onclick="toggleMetricsDisplay()">toggle metrics display</button><br>
+    <div id="metricsButton">
 <button type="button" class="btn btn-xs btn-primary" onclick="windowSliding=!windowSliding; refreshCanvas()">toggle sliding/fixed window</button><br>
 <button type="button" class="btn btn-xs btn-primary" onclick="timeRangeSetSliding(0)">window ALL</button>
 <button type="button" class="btn btn-xs btn-primary" onclick="timeRangeSetSliding(2000)">2s</button>
@@ -231,14 +230,16 @@ cap level: <div id="levelCappingControl" style="display: inline;"></div>
 <button type="button" class="btn btn-xs btn-primary" onclick="timeRangeSlideLeft()"> <<< Window Slide </button>
 <button type="button" class="btn btn-xs btn-primary" onclick="timeRangeSlideRight()">Window Slide >>> </button><br>
 <button type="button" class="btn btn-xs btn-primary" onclick="windowStart=document.getElementById('windowStart').value">fixed window start(ms)</button>
-<input type="text" id='windowStart' defaultValue="0" size="8" onkeydown="if(event.keyCode=='13'){windowStart=document.getElementById('windowStart').value;}">
+    <input type="text" id='windowStart' defaultValue="0" size="8" onkeydown="if(window.event.keyCode=='13'){windowStart=document.getElementById('windowStart').value;}">
 <button type="button" class="btn btn-xs btn-primary" onclick="windowEnd=document.getElementById('windowEnd').value">fixed window end(ms)</button>
-<input type="text" id='windowEnd' defaultValue="10000" size="8" onkeydown="if(event.keyCode=='13'){windowEnd=document.getElementById('windowEnd').value;}"><br>
+    <input type="text" id='windowEnd' defaultValue="10000" size="8" onkeydown="if(window.event.keyCode=='13'){windowEnd=document.getElementById('windowEnd').value;}"><br>
 <button type="button" class="btn btn-xs btn-success" onclick="exportmetrics()" style="font-size:18px">metrics permalink</button>
 <canvas id="bufferTimerange_c" width="640" height="100" style="border:1px solid #000000" onmousedown="timeRangeCanvasonMouseDown(event)" onmousemove="timeRangeCanvasonMouseMove(event)" onmouseup="timeRangeCanvasonMouseUp(event)" onmouseout="timeRangeCanvasonMouseOut(event)";></canvas>
 <canvas id="bufferWindow_c" width="640" height="100" style="border:1px solid #000000" onmousemove="windowCanvasonMouseMove(event)";></canvas>
 <canvas id="videoEvent_c" width="640" height="15" style="border:1px solid #000000";></canvas>
 <canvas id="loadEvent_c" width="640" height="15" style="border:1px solid #000000";></canvas><br>
+  </div>
+  <pre id='HlsStats'></pre>
 <h3> Test Videos </h3>
 <div> The following videos should stream correctly. Each time an
 issue is reported with a sample playlist, it will be added in the list
@@ -250,7 +251,7 @@ and verified after bugfixing </div>
 
 <script type="text/javascript">
 function userSubmit() {
-   load(document.getElementById('userInput').value);
+   loadStream(document.getElementById('userInput').value);
 }
 </script>
 
@@ -268,7 +269,7 @@ if(manifest === 'undefined') {
 document.getElementById('userInput').value=manifest;
 
 var events;
-var startDate;
+var jsPingDate,flashPingDate, jsLoadDate, flashLoadDate;
 var player_id = "mymoviename";
 var lastSeekingIdx;
 var api;
@@ -291,7 +292,9 @@ function appendLog(txt)
 }
 
 function load(url) {
-  startDate = new Date();
+  jsLoadDate = new Date();
+  flashLoadDate = (jsLoadDate - jsPingDate )+ flashPingDate;
+  events = { url : current_url, date : jsLoadDate, load : [], buffer : [], video : []};
   current_url = url;
   api.load(url);
   appendLog("load URL " + url);
@@ -355,7 +358,9 @@ window.flashlsCallback = function(eventName, args) {
 };
 
 var flashlsEvents = {
-   ready: function() {
+   ready: function(flashTime) {
+    flashPingDate = flashTime;
+    jsPingDate = new Date();
     appendLog("onHLSReady()");
     api = new flashlsAPI(getFlashMovieObject(player_id));
     document.getElementById('mediaInfo').rows[Y_LOW_BUFFER].cells[X_LOW_BUFFER].innerHTML = api.getLowBufferLength().toFixed(2);
@@ -363,7 +368,7 @@ var flashlsEvents = {
     document.getElementById('mediaInfo').rows[Y_MAX_BUFFER].cells[X_MAX_BUFFER].innerHTML = api.getMaxBufferLength().toFixed(2);
   },
   videoSize: function(width, height) {
-    var event = {time : new Date() - startDate, type : "resize", name : width + 'x' + height};
+    var event = {time : new Date() - jsLoadDate, type : "resize", name : width + 'x' + height};
     events.video.push(event);
     var state = api.getCapLeveltoStage();
     if(!state) {
@@ -389,7 +394,6 @@ var flashlsEvents = {
     document.getElementById('mediaInfo').rows[Y_DURATION].cells[X_DURATION].innerHTML =  duration.toFixed(2);
     showCanvas();
     updateLevelInfo();
-    events = { url : current_url, date : new Date(), load : [], buffer : [], video : []};
     api.play(-1);
     api.volume(10);
     var event = {
@@ -400,7 +404,7 @@ var flashlsEvents = {
                 duration : loadmetrics.loading_end_time - loadmetrics.loading_begin_time,
                 bw : Math.round(loadmetrics.bandwidth/1000)
               };
-    event.time = new Date() - startDate - (loadmetrics.loading_end_time - loadmetrics.loading_request_time);
+    event.time = loadmetrics.loading_request_time - flashLoadDate;
     events.load.push(event);
     refreshCanvas();
   },
@@ -415,7 +419,7 @@ var flashlsEvents = {
                 duration : loadmetrics.loading_end_time - loadmetrics.loading_begin_time,
                 bw : Math.round(loadmetrics.bandwidth/1000)
               };
-    event.time = new Date() - startDate - (loadmetrics.loading_end_time - loadmetrics.loading_request_time);
+    event.time = loadmetrics.loading_request_time - flashLoadDate;
     events.load.push(event);
     refreshCanvas();
   },
@@ -430,7 +434,7 @@ var flashlsEvents = {
                 duration : loadmetrics.loading_end_time - loadmetrics.loading_begin_time,
                 bw : Math.round(loadmetrics.bandwidth/1000)
               };
-    event.time = new Date() - startDate - (loadmetrics.loading_end_time - loadmetrics.loading_request_time);
+    event.time = loadmetrics.loading_request_time - flashLoadDate;
     events.load.push(event);
     refreshCanvas();
   },
@@ -444,17 +448,18 @@ var flashlsEvents = {
                 duration : loadmetrics.parsing_end_time - loadmetrics.loading_begin_time,
                 bw : Math.round(loadmetrics.bandwidth/1000)
               };
-    event.time = new Date() - startDate - (loadmetrics.parsing_end_time - loadmetrics.loading_request_time);
+    event.time = loadmetrics.loading_request_time - flashLoadDate;
     if(loadmetrics.type == 4) {
       event.type =  'fragment audio'
     } else {
       event.type =  'fragment main'
     }
     events.load.push(event);
+    document.getElementById("HlsStats").innerHTML = JSON.stringify(api.getStats(),null,"\t");
     refreshCanvas();
   },
   fragmentPlaying: function(playmetrics) {
-    var event = {time : new Date() - startDate, type : "playing frag", name : playmetrics.seqnum + '@' + playmetrics.level, duration : playmetrics.duration*1000};
+    var event = {time : new Date() - jsLoadDate, type : "playing frag", name : playmetrics.seqnum + '@' + playmetrics.level, duration : playmetrics.duration*1000};
     events.video.push(event);
     updateLevelInfo();
   },
@@ -465,7 +470,7 @@ var flashlsEvents = {
     document.getElementById('mediaInfo').rows[Y_BACK_BUFFER].cells[X_BACK_BUFFER].innerHTML =  timemetrics.backbuffer.toFixed(2);
     document.getElementById('mediaInfo').rows[Y_PLAYLIST_SLIDING].cells[X_PLAYLIST_SLIDING].innerHTML =  timemetrics.live_sliding_main.toFixed(2);
 
-    var event = { time : new Date() - startDate, buffer : Math.round(1000*timemetrics.buffer), pos: Math.round(1000*timemetrics.position)};
+    var event = { time : new Date() - jsLoadDate, buffer : Math.round(1000*timemetrics.buffer), pos: Math.round(1000*timemetrics.position)};
     var bufEvents = events.buffer, bufEventLen = bufEvents.length;
     if(bufEventLen > 1) {
       var event0 = bufEvents[bufEventLen-2],event1 = bufEvents[bufEventLen-1];
@@ -486,12 +491,12 @@ var flashlsEvents = {
     refreshCanvas();
   },
   state: function(newState) {
-    var event = {time : new Date() - startDate, type : newState.toLowerCase(), name : ''};
+    var event = {time : new Date() - jsLoadDate, type : newState.toLowerCase(), name : ''};
     events.video.push(event);
     document.getElementById('mediaInfo').rows[Y_STATE].cells[X_STATE].innerHTML =  newState;
   },
   seekState: function(newState) {
-    var event = {time : new Date() - startDate, type : newState.toLowerCase(), name : ''};
+    var event = {time : new Date() - jsLoadDate, type : newState.toLowerCase(), name : ''};
     events.video.push(event);
 
     if(event.type === 'seeking') {
@@ -502,7 +507,7 @@ var flashlsEvents = {
     }
   },
   switch: function(newLevel) {
-    var event = {time : new Date() - startDate, type : "levelSwitch", name : newLevel.toFixed()};
+    var event = {time : new Date() - jsLoadDate, type : "levelSwitch", name : newLevel.toFixed()};
     events.video.push(event);
     document.getElementById('mediaInfo').rows[Y_LOAD_LEVEL].cells[X_LOAD_LEVEL].innerHTML =  newLevel;
   },
@@ -517,12 +522,12 @@ var flashlsEvents = {
     d.innerHTML = html;
   },
   audioTrackChange: function(trackId) {
-    var event = {time : new Date() - startDate, type : "audioTrackChange", name : trackId.toFixed()};
+    var event = {time : new Date() - jsLoadDate, type : "audioTrackChange", name : trackId.toFixed()};
     events.video.push(event);
     document.getElementById('mediaInfo').rows[Y_AUDIOTRACKID].cells[X_AUDIOTRACKID].innerHTML = trackId;
   },
   id3Updated: function(ID3Data) {
-    var event = {time : new Date() - startDate, type : "ID3Data"};
+    var event = {time : new Date() - jsLoadDate, type : "ID3Data"};
     events.video.push(event);
   },
   requestPlaylist: JSLoaderPlaylist.requestPlaylist.bind(JSLoaderPlaylist),

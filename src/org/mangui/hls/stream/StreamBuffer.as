@@ -133,7 +133,7 @@ package org.mangui.hls.stream {
                 // seek position is out of buffer : load from fragment
                 _fragmentLoader.seek(_seekPositionRequested);
                 // check if we need to use alt audio fragment loader
-                if (_hls.audioTracks.length && _hls.audioTrack >= 0 && _hls.audioTracks[_hls.audioTrack].source == AudioTrack.FROM_PLAYLIST) {
+                if (_hls.audioTracks && _hls.audioTracks.length && _hls.audioTrack >= 0 && _hls.audioTracks[_hls.audioTrack].source == AudioTrack.FROM_PLAYLIST) {
                     CONFIG::LOGGING {
                         Log.info("seek : need to load alt audio track");
                     }
@@ -150,7 +150,8 @@ package org.mangui.hls.stream {
         public function appendTags(fragmentType : int, fragLevel : int, fragSN : int, tags : Vector.<FLVTag>, min_pts : Number, max_pts : Number, continuity : int, startPosition : Number) : void {
             // compute playlist sliding here :  it is the difference between  expected start position and real start position
             var sliding:Number = 0, _nextRelativeStartPos: Number = startPosition + (max_pts - min_pts) / 1000, headerAppended : Boolean = false, metaAppended : Boolean = false;
-            if(_hls.type == HLSTypes.LIVE) {
+            // compute sliding in case of live playlist, or in case of VoD playlist that slided in the past (live sliding ended playlist)
+            if(_hls.type == HLSTypes.LIVE  || _playlistSlidingMain || _playlistSlidingAltAudio) {
                 if(fragmentType == HLSLoaderTypes.FRAGMENT_MAIN) {
                     // if -1 : it is not the first appending for this fragment type : we can compute playlist sliding
                     if(_nextExpectedAbsoluteStartPosMain !=-1) {
@@ -267,6 +268,9 @@ package org.mangui.hls.stream {
             _reachedEnd = false;
             _playlistSlidingMain = _playlistSlidingAltAudio = 0;
             _nextExpectedAbsoluteStartPosMain = _nextExpectedAbsoluteStartPosAltAudio = -1;
+            CONFIG::LOGGING {
+                Log.debug("StreamBuffer flushed");
+            }
         }
 
         private function flushAudio() : void {
@@ -427,7 +431,7 @@ package org.mangui.hls.stream {
              * this is to ensure that accurate seeking will work appropriately
              */
             CONFIG::LOGGING {
-                Log.debug2("position/audio/video bufferLength:" + position.toFixed(2) + "/" + audioBufferLength.toFixed(2) + "/" + videoBufferLength.toFixed(2));
+                Log.debug2("position/audio/video/NetStream bufferLength:" + position.toFixed(2) + "/" + audioBufferLength.toFixed(2) + "/" + videoBufferLength.toFixed(2) + "/" + (_hls.stream as HLSNetStream).netStreamBufferLength.toFixed(2));
             }
 
             var duration : Number = 0;

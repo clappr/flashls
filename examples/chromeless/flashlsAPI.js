@@ -66,15 +66,15 @@ var flashlsAPI = function(flashObject) {
 	}
 
 	this.getLowBufferLength = function() {
-		return this.flashObject.getLowBufferLength();
+		return this.flashObject.getlowBufferLength();
 	}
 
 	this.getMinBufferLength = function() {
-		return this.flashObject.getMinBufferLength();
+		return this.flashObject.getminBufferLength();
 	}
 
 	this.getMaxBufferLength = function() {
-		return this.flashObject.getMaxBufferLength();
+		return this.flashObject.getmaxBufferLength();
 	}
 
 	this.getLevels = function() {
@@ -99,6 +99,10 @@ var flashlsAPI = function(flashObject) {
 
 	this.getAudioTrackList = function() {
 		return this.flashObject.getAudioTrackList();
+	}
+
+	this.getStats = function() {
+		return this.flashObject.getStats();
 	}
 
 	this.setAudioTrack = function(trackId) {

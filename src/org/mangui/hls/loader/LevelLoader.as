@@ -140,17 +140,18 @@ package org.mangui.hls.loader {
             _retryCount = 0;
             _altAudioTracks = null;
             _hls.dispatchEvent(new HLSEvent(HLSEvent.MANIFEST_LOADING, url));
-
+            _metrics = new HLSLoadMetrics(HLSLoaderTypes.MANIFEST);
+            _metrics.loading_request_time = getTimer();
             if (DataUri.isDataUri(url)) {
                 CONFIG::LOGGING {
                     Log.debug("Identified main manifest <" + url + "> as a data URI.");
                 }
+                _metrics.loading_begin_time = getTimer();
                 var data : String = new DataUri(url).extractData();
+                _metrics.loading_end_time = getTimer();
                 _parseManifest(data || "");
             } else {
                 _urlloader.load(new URLRequest(url));
-                _metrics = new HLSLoadMetrics(HLSLoaderTypes.MANIFEST);
-                _metrics.loading_request_time = getTimer();
             }
         };
 
@@ -173,17 +174,38 @@ package org.mangui.hls.loader {
 
         /** parse a playlist **/
         private function _parseLevelPlaylist(string : String, url : String, level : int, metrics : HLSLoadMetrics) : void {
-            if (string != null && string.length != 0) {
+            var frags : Vector.<Fragment>;
+            if (string != null) {
                 CONFIG::LOGGING {
                     Log.debug("level " + level + " playlist:\n" + string);
                 }
-                var frags : Vector.<Fragment> = Manifest.getFragments(string, url, level);
+                frags = Manifest.getFragments(string, url, level);
+            }
+
+            if(frags && frags.length) {
+                // successful loading, reset retry counter
+                _retryTimeout = 1000;
+                _retryCount = 0;
                 // set fragment and update sequence number range
                 _levels[level].updateFragments(frags);
                 _levels[level].targetduration = Manifest.getTargetDuration(string);
                 _hls.dispatchEvent(new HLSEvent(HLSEvent.PLAYLIST_DURATION_UPDATED, _levels[level].duration));
+            } else {
+                if(HLSSettings.manifestLoadMaxRetry == -1 || _retryCount < HLSSettings.manifestLoadMaxRetry) {
+                    CONFIG::LOGGING {
+                        Log.warn("empty level Playlist, retry in " + _retryTimeout + " ms");
+                    }
+                    _timeoutID = setTimeout(_loadActiveLevelPlaylist, _retryTimeout);
+                    /* exponential increase of retry timeout, capped to manifestLoadMaxRetryTimeout */
+                    _retryTimeout = Math.min(HLSSettings.manifestLoadMaxRetryTimeout, 2 * _retryTimeout);
+                    _retryCount++;
+                    return;
+                } else {
+                    var hlsError : HLSError = new HLSError(HLSError.MANIFEST_LOADING_IO_ERROR, _url, "no fragments in playlist");
+                    _hls.dispatchEvent(new HLSEvent(HLSEvent.ERROR, hlsError));
+                    return;
+                }
             }
-
             // Check whether the stream is live or not finished yet
             if (Manifest.hasEndlist(string)) {
                 _type = HLSTypes.VOD;
@@ -220,6 +242,7 @@ package org.mangui.hls.loader {
 
         /** Parse First Level Playlist **/
         private function _parseManifest(string : String) : void {
+            var errorTxt : String = null;
             // Check for M3U8 playlist or manifest.
             if (string.indexOf(Manifest.HEADER) == 0) {
                 // 1 level playlist, create unique level and parse playlist
@@ -242,31 +265,34 @@ package org.mangui.hls.loader {
                     }
                     // adaptative playlist, extract levels from playlist, get them and parse them
                     _levels = Manifest.extractLevels(string, _url);
-
-                    var levelsLength : int = _levels.length;
-                    if (levelsLength == 0) {
-                        hlsError = new HLSError(HLSError.MANIFEST_PARSING_ERROR, _url, "No level found in Manifest");
-                        _hls.dispatchEvent(new HLSEvent(HLSEvent.ERROR, hlsError));
-                    }
-                    _metrics.parsing_end_time = getTimer();
-                    _loadLevel = -1;
-                    _hls.dispatchEvent(new HLSEvent(HLSEvent.MANIFEST_PARSED, _levels));
-                    if (string.indexOf(Manifest.ALTERNATE_AUDIO) > 0) {
-                        CONFIG::LOGGING {
-                            Log.debug("alternate audio level found");
-                        }
-                        // parse alternate audio tracks
-                        _altAudioTracks = Manifest.extractAltAudioTracks(string, _url);
-                        CONFIG::LOGGING {
-                            if (_altAudioTracks.length > 0) {
-                                Log.debug(_altAudioTracks.length + " alternate audio tracks found");
+                    if (_levels.length) {
+                        _metrics.parsing_end_time = getTimer();
+                        _loadLevel = -1;
+                        _hls.dispatchEvent(new HLSEvent(HLSEvent.MANIFEST_PARSED, _levels));
+                        if (string.indexOf(Manifest.ALTERNATE_AUDIO) > 0) {
+                            CONFIG::LOGGING {
+                                Log.debug("alternate audio level found");
+                            }
+                            // parse alternate audio tracks
+                            _altAudioTracks = Manifest.extractAltAudioTracks(string, _url);
+                            CONFIG::LOGGING {
+                                if (_altAudioTracks.length > 0) {
+                                    Log.debug(_altAudioTracks.length + " alternate audio tracks found");
+                                }
                             }
                         }
+                    } else {
+                        errorTxt = "No level found in Manifest";
                     }
+                } else {
+                    // manifest start with correct header, but it does not contain any fragment or level info ...
+                    errorTxt = "empty Manifest";
                 }
             } else {
-                var hlsError : HLSError = new HLSError(HLSError.MANIFEST_PARSING_ERROR, _url, "Manifest is not a valid M3U8 file");
-                _hls.dispatchEvent(new HLSEvent(HLSEvent.ERROR, hlsError));
+                errorTxt = "Manifest is not a valid M3U8 file";
+            }
+            if(errorTxt) {
+                _hls.dispatchEvent(new HLSEvent(HLSEvent.ERROR, new HLSError(HLSError.MANIFEST_PARSING_ERROR, _url, errorTxt)));
             }
         };
 
