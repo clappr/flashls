@@ -15,7 +15,7 @@ package io.clappr {
       Security.allowInsecureDomain("*");
       ExternalInterface.addCallback("playerSetLogInfo", _setLogInfo);
       var playbackId : String = LoaderInfo(this.root.loaderInfo).parameters.playbackId;
-      ExternalInterface.call("console.log", "FlasHLS Clappr (version: 0.4.1.2 - flashls: 0.4.1.1+(58f08b4), id: " + playbackId + ")");
+      ExternalInterface.call("console.log", "FlasHLS Clappr (version: 0.4.2 - flashls: 0.4.2.1, id: " + playbackId + ")");
     }
 
     private function _setLogInfo(logInfo: Boolean) : void {
