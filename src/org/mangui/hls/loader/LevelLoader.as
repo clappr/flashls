@@ -98,8 +98,20 @@ package org.mangui.hls.loader {
                 _retryCount++;
                 return;
             } else {
-                code = HLSError.MANIFEST_LOADING_IO_ERROR;
-                txt = "Cannot load M3U8: " + event.text;
+                // if we have redundant streams left for that level, switch to it
+                if(_loadLevel < _levels.length && _levels[_loadLevel].redundantStreamId < _levels[_loadLevel].redundantStreamsNb) {
+                    CONFIG::LOGGING {
+                        Log.warn("max load retry reached, switch to redundant stream");
+                    }
+                    _levels[_loadLevel].redundantStreamId++;
+                    _timeoutID = setTimeout(_loadActiveLevelPlaylist, 0);
+                    _retryTimeout = 1000;
+                    _retryCount = 0;
+                    return;
+                } else {
+                    code = HLSError.MANIFEST_LOADING_IO_ERROR;
+                    txt = "Cannot load M3U8: " + event.text;
+                }
             }
             var hlsError : HLSError = new HLSError(code, _url, txt);
             _hls.dispatchEvent(new HLSEvent(HLSEvent.ERROR, hlsError));
@@ -219,9 +231,9 @@ package org.mangui.hls.loader {
                 */
                 var _reloadInterval : Number = 1000*Math.min((_levels[level].duration - _hls.position)/2,_levels[level].averageduration);
                 // avoid spamming the server if we are at the edge ... wait 500ms between 2 reload at least
-                var timeout : Number = Math.max(500, _reloadPlaylistTimer + _reloadInterval - getTimer());
+                var timeout : int = Math.max(500, _reloadPlaylistTimer + _reloadInterval - getTimer());
                 CONFIG::LOGGING {
-                    Log.debug("Level " + level + " Live Playlist parsing finished: reload in " + timeout.toFixed(0) + " ms");
+                    Log.debug("Level " + level + " Live Playlist parsing finished: reload in " + timeout + " ms");
                 }
                 _timeoutID = setTimeout(_loadActiveLevelPlaylist, timeout);
             }
@@ -248,7 +260,8 @@ package org.mangui.hls.loader {
                 // 1 level playlist, create unique level and parse playlist
                 if (string.indexOf(Manifest.FRAGMENT) > 0) {
                     var level : Level = new Level();
-                    level.url = _url;
+                    level.urls = new Vector.<String>();
+                    level.urls.push(_url);
                     _levels.push(level);
                     _metrics.parsing_end_time = getTimer();
                     _hls.dispatchEvent(new HLSEvent(HLSEvent.MANIFEST_PARSED, _levels));
