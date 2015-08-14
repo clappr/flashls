@@ -17,7 +17,7 @@ package io.clappr {
       ExternalInterface.addCallback("playerSetSeekMode", _setSeekMode);
       ExternalInterface.addCallback("playerSetStartFromBitrate", _setStartFromBitrate);
       var playbackId : String = LoaderInfo(this.root.loaderInfo).parameters.playbackId;
-      ExternalInterface.call("console.log", "FlasHLS Clappr (version: 0.4.2 - flashls: 0.4.2.1, id: " + playbackId + ")");
+      ExternalInterface.call("console.log", "FlasHLS Clappr (version: 0.4.2.1 - flashls: 0.4.2.1, id: " + playbackId + ")");
     }
 
     private function _setLogInfo(logInfo: Boolean) : void {
