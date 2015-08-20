@@ -13,6 +13,12 @@ package io.clappr {
       super();
       Security.allowDomain("*");
       Security.allowInsecureDomain("*");
+      var playbackId : String = LoaderInfo(this.root.loaderInfo).parameters.playbackId;
+      ExternalInterface.call("console.log", "FlasHLS Clappr (version: 0.4.2.2 - flashls: 0.4.2.1, id: " + playbackId + ")");
+    }
+
+    override protected function _setupExternalCallers() : void {
+      super._setupExternalCallers();
       ExternalInterface.addCallback("playerSetKeyLoadMaxRetry", _setKeyLoadMaxRetry);
       ExternalInterface.addCallback("playerSetKeyLoadMaxRetryTimeout", _setKeyLoadMaxRetryTimeout);
       ExternalInterface.addCallback("playerSetFragmentLoadMaxRetry", _setFragmentLoadMaxRetry);
@@ -25,8 +31,6 @@ package io.clappr {
       ExternalInterface.addCallback("playerSetFpsDroppedMonitoringThreshold", _setFpsDroppedMonitoringThreshold);
       ExternalInterface.addCallback("playerSetCapLevelonFPSDrop", _setCapLevelonFPSDrop);
       ExternalInterface.addCallback("playerSetSmoothAutoSwitchonFPSDrop", _setSmoothAutoSwitchonFPSDrop);
-      var playbackId : String = LoaderInfo(this.root.loaderInfo).parameters.playbackId;
-      ExternalInterface.call("console.log", "FlasHLS Clappr (version: 0.4.2.2 - flashls: 0.4.2.1, id: " + playbackId + ")");
     }
 
     private function _setKeyLoadMaxRetry(keyLoadMaxRetry: int) : void {
