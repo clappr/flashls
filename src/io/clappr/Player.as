@@ -21,6 +21,10 @@ package io.clappr {
       ExternalInterface.addCallback("playerSetLogInfo", _setLogInfo);
       ExternalInterface.addCallback("playerSetSeekMode", _setSeekMode);
       ExternalInterface.addCallback("playerSetStartFromBitrate", _setStartFromBitrate);
+      ExternalInterface.addCallback("playerSetFpsDroppedMonitoringPeriod", _setFpsDroppedMonitoringPeriod);
+      ExternalInterface.addCallback("playerSetFpsDroppedMonitoringThreshold", _setFpsDroppedMonitoringThreshold);
+      ExternalInterface.addCallback("playerSetCapLevelonFPSDrop", _setCapLevelonFPSDrop);
+      ExternalInterface.addCallback("playerSetSmoothAutoSwitchonFPSDrop", _setSmoothAutoSwitchonFPSDrop);
       var playbackId : String = LoaderInfo(this.root.loaderInfo).parameters.playbackId;
       ExternalInterface.call("console.log", "FlasHLS Clappr (version: 0.4.2.2 - flashls: 0.4.2.1, id: " + playbackId + ")");
     }
@@ -55,6 +59,22 @@ package io.clappr {
 
     private function _setStartFromBitrate(startFromBitrate: Number) : void {
       HLSSettings.startFromBitrate = startFromBitrate;
+    }
+
+    private function _setFpsDroppedMonitoringPeriod(fpsDroppedMonitoringPeriod: int) : void {
+      HLSSettings.fpsDroppedMonitoringPeriod = fpsDroppedMonitoringPeriod;
+    }
+
+    private function _setFpsDroppedMonitoringThreshold(fpsDroppedMonitoringThreshold: Number) : void {
+      HLSSettings.fpsDroppedMonitoringThreshold = fpsDroppedMonitoringThreshold;
+    }
+
+    private function _setCapLevelonFPSDrop(capLevelonFPSDrop: Boolean) : void {
+      HLSSettings.capLevelonFPSDrop = capLevelonFPSDrop;
+    }
+
+    private function _setSmoothAutoSwitchonFPSDrop(smoothAutoSwitchonFPSDrop: Boolean) : void {
+      HLSSettings.smoothAutoSwitchonFPSDrop = smoothAutoSwitchonFPSDrop;
     }
   }
 }
