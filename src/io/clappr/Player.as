@@ -10,7 +10,7 @@ package io.clappr {
 
   public class Player extends ChromelessPlayer {
 
-    private static const CLAPPR_VERSION : String = "0.4.2.3";
+    private static const CLAPPR_VERSION : String = "0.4.3";
     private static const FLASHLS_VERSION : String = "0.4.2.1";
 
     public function Player() {
