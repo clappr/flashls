@@ -6,15 +6,17 @@ package io.clappr {
   import flash.external.ExternalInterface;
   import flash.system.Security;
   import org.mangui.hls.HLSSettings;
+  import org.mangui.hls.utils.Log;
 
   public class Player extends ChromelessPlayer {
+
+    private static const CLAPPR_VERSION : String = "0.4.2.3";
+    private static const FLASHLS_VERSION : String = "0.4.2.1";
 
     public function Player() {
       super();
       Security.allowDomain("*");
       Security.allowInsecureDomain("*");
-      var playbackId : String = LoaderInfo(this.root.loaderInfo).parameters.playbackId;
-      ExternalInterface.call("console.log", "FlasHLS Clappr (version: 0.4.2.3 - flashls: 0.4.2.1, id: " + playbackId + ")");
     }
 
     override protected function _setupExternalCallers() : void {
@@ -31,6 +33,31 @@ package io.clappr {
       ExternalInterface.addCallback("playerSetFpsDroppedMonitoringThreshold", _setFpsDroppedMonitoringThreshold);
       ExternalInterface.addCallback("playerSetCapLevelonFPSDrop", _setCapLevelonFPSDrop);
       ExternalInterface.addCallback("playerSetSmoothAutoSwitchonFPSDrop", _setSmoothAutoSwitchonFPSDrop);
+    }
+
+    override protected function _setupExternalGetters() : void {
+      super._setupExternalGetters();
+      ExternalInterface.addCallback("getVersion", _getVersion);
+      ExternalInterface.addCallback("getClapprVersion", _getClapprVersion);
+      ExternalInterface.addCallback("getFlashlsVersion", _getFlashlsVersion);
+    }
+
+    override protected function _load(url : String) : void {
+      Log.info(_getVersion());
+      super._load(url);
+    }
+
+    protected function _getVersion() : String {
+      var playbackId : String = LoaderInfo(this.root.loaderInfo).parameters.playbackId;
+      return "FlasHLS Clappr (version: " + _getClapprVersion() + " - flashls: "+ _getFlashlsVersion() + ", id: " + playbackId + ")";
+    }
+
+    protected function _getClapprVersion() : String {
+      return CLAPPR_VERSION;
+    }
+
+    protected function _getFlashlsVersion() : String {
+      return FLASHLS_VERSION;
     }
 
     private function _setKeyLoadMaxRetry(keyLoadMaxRetry: int) : void {
