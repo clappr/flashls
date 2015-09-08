@@ -150,40 +150,44 @@ package org.mangui.hls.loader {
                     break;
                 // loading already in progress
                 case LOADING_IN_PROGRESS:
-                    // monitor fragment load progress after half of expected fragment duration,to stabilize bitrate
-                    var requestDelay : int = getTimer() - _metrics.loading_request_time;
-                    var fragDuration : Number = _fragCurrent.duration;
-                    if(requestDelay > 500*fragDuration) {
-                        var loaded : int = _fragCurrent.data.bytesLoaded;
-                        var expected : int = fragDuration*_levels[_fragCurrent.level].bitrate/8;
-                        if(expected < loaded) {
-                            expected = loaded;
-                        }
-                        var loadRate : int = loaded*1000/requestDelay; // byte/s
-                        var fragLoadedDelay : Number =(expected-loaded)/loadRate;
-                        var fragLevel0LoadedDelay : Number = fragDuration*_levels[0].bitrate/(8*loadRate); //bps/Bps
-                        var bufferLen : Number = _hls.stream.bufferLength;
-                        // CONFIG::LOGGING {
-                        //     Log.info("bufferLen/fragDuration/fragLoadedDelay/fragLevel0LoadedDelay:" + bufferLen.toFixed(1) + "/" + fragDuration.toFixed(1) + "/" + fragLoadedDelay.toFixed(1) + "/" + fragLevel0LoadedDelay.toFixed(1));
-                        // }
-                        /* if we have less than 2 frag duration in buffer and if frag loaded delay is greater than buffer len
-                          ... and also bigger than duration needed to load fragment at next level ...*/
-                        if(bufferLen < 2*fragDuration && fragLoadedDelay > bufferLen && fragLoadedDelay > fragLevel0LoadedDelay) {
-                            // abort fragment loading ...
-                            CONFIG::LOGGING {
-                                Log.warn("_checkLoading : loading too slow, abort fragment loading");
-                                Log.warn("fragLoadedDelay/bufferLen/fragLevel0LoadedDelay:" + fragLoadedDelay.toFixed(1) + "/" + bufferLen.toFixed(1) + "/" + fragLevel0LoadedDelay.toFixed(1));
+                    // only monitor fragment loading rate if in auto mode, and current level is not the lowest level
+                    if(_hls.autoLevel && _fragCurrent.level) {
+                        // monitor fragment load progress after half of expected fragment duration,to stabilize bitrate
+                        var requestDelay : int = getTimer() - _metrics.loading_request_time;
+                        var fragDuration : Number = _fragCurrent.duration;
+                        if(requestDelay > 500*fragDuration) {
+                            var loaded : int = _fragCurrent.data.bytesLoaded;
+                            var expected : int = fragDuration*_levels[_fragCurrent.level].bitrate/8;
+                            if(expected < loaded) {
+                                expected = loaded;
                             }
-                            //abort fragment loading
-                            _stop_load();
-                            // fill loadMetrics so please LevelController that will adjust bw for next fragment
-                            // fill theoritical value, assuming bw will remain as it is
-                            _metrics.size = expected;
-                            _metrics.duration = 1000*fragDuration;
-                            _metrics.loading_end_time = _metrics.parsing_end_time = _metrics.loading_request_time + 1000*expected/loadRate;
-                            _hls.dispatchEvent(new HLSEvent(HLSEvent.FRAGMENT_LOAD_EMERGENCY_ABORTED, _metrics));
-                          // switch back to IDLE state to request new fragment at lowest level
-                          _loadingState = LOADING_IDLE;
+                            var loadRate : int = loaded*1000/requestDelay; // byte/s
+                            var fragLoadedDelay : Number =(expected-loaded)/loadRate;
+                            var fragLevel0LoadedDelay : Number = fragDuration*_levels[0].bitrate/(8*loadRate); //bps/Bps
+                            var bufferLen : Number = _hls.stream.bufferLength;
+                            // CONFIG::LOGGING {
+                            //     Log.info("bufferLen/fragDuration/fragLoadedDelay/fragLevel0LoadedDelay:" + bufferLen.toFixed(1) + "/" + fragDuration.toFixed(1) + "/" + fragLoadedDelay.toFixed(1) + "/" + fragLevel0LoadedDelay.toFixed(1));
+                            // }
+                            /* if we have less than 2 frag duration in buffer and if frag loaded delay is greater than buffer len
+                              ... and also bigger than duration needed to load fragment at next level ...*/
+                            if(bufferLen < 2*fragDuration && fragLoadedDelay > bufferLen && fragLoadedDelay > fragLevel0LoadedDelay) {
+                                // abort fragment loading ...
+                                CONFIG::LOGGING {
+                                    Log.warn("_checkLoading : loading too slow, abort fragment loading");
+                                    Log.warn("fragLoadedDelay/bufferLen/fragLevel0LoadedDelay:" + fragLoadedDelay.toFixed(1) + "/" + bufferLen.toFixed(1) + "/" + fragLevel0LoadedDelay.toFixed(1));
+                                }
+                                //abort fragment loading
+                                _stop_load();
+                                // fill loadMetrics so please LevelController that will adjust bw for next fragment
+                                // fill theoritical value, assuming bw will remain as it is
+                                _metrics.size = expected;
+                                _metrics.duration = 1000*fragDuration;
+                                _metrics.loading_end_time = _metrics.parsing_end_time = _metrics.loading_request_time + 1000*expected/loadRate;
+                                _hls.dispatchEvent(new HLSEvent(HLSEvent.FRAGMENT_LOAD_EMERGENCY_ABORTED, _metrics));
+                                _levelNext = _levelController.getnextlevel(_fragCurrent.level, bufferLen);
+                              // switch back to IDLE state to request new fragment at lowest level
+                              _loadingState = LOADING_IDLE;
+                            }
                         }
                     }
                     break;
@@ -199,7 +203,13 @@ package org.mangui.hls.loader {
                             if (_manifestJustLoaded) {
                                 level = _hls.startLevel;
                             } else {
-                                level = _hls.seekLevel;
+                                if(_hls.stream.bufferLength) {
+                                    // if buffer not empty, select level from heuristics
+                                    level = _levelController.getnextlevel(_hls.loadLevel, _hls.stream.bufferLength);
+                                } else {
+                                    // if buffer empty, retrieve seek level
+                                    level = _hls.seekLevel;
+                                }
                             }
                         } else {
                             level = _hls.manualLevel;
@@ -302,6 +312,9 @@ package org.mangui.hls.loader {
         }
 
         public function seek(position : Number) : void {
+            CONFIG::LOGGING {
+                Log.debug("FragmentLoader:seek(" + position.toFixed(2) + ")");
+            }
             // reset IO Error when seeking
             _fragRetryCount = _keyRetryCount = 0;
             _fragRetryTimeout = _keyRetryTimeout = 1000;
@@ -310,6 +323,7 @@ package org.mangui.hls.loader {
             _fragmentFirstLoaded = false;
             _fragPrevious = null;
             _fragSkipping = false;
+            _levelNext = -1;
             _timer.start();
         }
 
@@ -403,6 +417,8 @@ package org.mangui.hls.loader {
                     _fragRetryCount = 0;
                     _fragRetryTimeout = 1000;
                     _loadingState = LOADING_IDLE;
+                    // dispatch event to force redundant level loading
+                    _hls.dispatchEvent(new HLSEvent(HLSEvent.LEVEL_SWITCH, _fragCurrent.level));
                 } else if(HLSSettings.fragmentLoadSkipAfterMaxRetry == true) {
                     /* check if loaded fragment is not the last one of a live playlist.
                         if it is the case, don't skip to next, as there is no next fragment :-)
@@ -456,7 +472,7 @@ package org.mangui.hls.loader {
                     _metrics.decryption_begin_time = getTimer();
                     fragData.decryptAES = new AES(_hls.stage, _keymap[_fragCurrent.decrypt_url], _fragCurrent.decrypt_iv, _fragDecryptProgressHandler, _fragDecryptCompleteHandler);
                     CONFIG::LOGGING {
-                        Log.debug("init AES context:" + fragData.decryptAES);
+                        Log.debug("init AES context");
                     }
                 } else {
                     fragData.decryptAES = null;
@@ -918,6 +934,7 @@ package org.mangui.hls.loader {
                 return;
             var hlsError : HLSError;
             var fragData : FragmentData = _fragCurrent.data;
+            var fragLevelIdx : int = _fragCurrent.level;
             if ((_demux.audioExpected && !fragData.audio_found) && (_demux.videoExpected && !fragData.video_found)) {
                 hlsError = new HLSError(HLSError.FRAGMENT_PARSING_ERROR, _fragCurrent.url, "error parsing fragment, no tag found");
                 _hls.dispatchEvent(new HLSEvent(HLSEvent.ERROR, hlsError));
@@ -944,12 +961,12 @@ package org.mangui.hls.loader {
 
             if (_manifestJustLoaded) {
                 _manifestJustLoaded = false;
-                if (HLSSettings.startFromLevel === -1 && HLSSettings.startFromBitrate === -1 && _levels.length > 1) {
+                if (HLSSettings.startFromLevel === -1 && HLSSettings.startFromBitrate === -1 && _levels.length > 1 && !_levelController.isStartLevelSet()) {
                     // check if we can directly switch to a better bitrate, in case download bandwidth is enough
                     var bestlevel : int = _levelController.getbestlevel(_metrics.bandwidth);
-                    if (bestlevel > _hls.loadLevel) {
+                    if (bestlevel > fragLevelIdx) {
                         CONFIG::LOGGING {
-                            Log.info("enough download bandwidth, adjust start level from " + _hls.loadLevel + " to " + bestlevel);
+                            Log.info("enough download bandwidth, adjust start level from 0 to " + bestlevel);
                         }
                         // dispatch event for tracking purpose
                         _hls.dispatchEvent(new HLSEvent(HLSEvent.FRAGMENT_LOADED, _metrics));
@@ -958,7 +975,7 @@ package org.mangui.hls.loader {
                         _loadingState = LOADING_IDLE;
                         _switchLevel = true;
                         _demux = null;
-                        _hls.dispatchEvent(new HLSEvent(HLSEvent.LEVEL_SWITCH, _hls.loadLevel));
+                        _hls.dispatchEvent(new HLSEvent(HLSEvent.LEVEL_SWITCH, fragLevelIdx));
                         // speed up loading of new playlist
                         _timer.start();
                         return;
@@ -969,14 +986,15 @@ package org.mangui.hls.loader {
             try {
                 _switchLevel = false;
                 _levelNext = -1;
+                var fragLevel : Level = _levels[fragLevelIdx];
                 CONFIG::LOGGING {
-                    Log.debug("Loaded        " + _fragCurrent.seqnum + " of [" + (_levels[_hls.loadLevel].start_seqnum) + "," + (_levels[_hls.loadLevel].end_seqnum) + "],level " + _hls.loadLevel + " m/M PTS:" + fragData.pts_min + "/" + fragData.pts_max);
+                    Log.debug("Loaded        " + _fragCurrent.seqnum + " of [" + (fragLevel.start_seqnum) + "," + (fragLevel.end_seqnum) + "],level " + fragLevelIdx + " m/M PTS:" + fragData.pts_min + "/" + fragData.pts_max);
                 }
                 if (fragData.audio_found || fragData.video_found) {
-                    _levels[_hls.loadLevel].updateFragment(_fragCurrent.seqnum, true, fragData.pts_min, fragData.pts_max + fragData.tag_duration);
+                    fragLevel.updateFragment(_fragCurrent.seqnum, true, fragData.pts_min, fragData.pts_max + fragData.tag_duration);
                     // set pts_start here, it might not be updated directly in updateFragment() if this loaded fragment has been removed from a live playlist
                     fragData.pts_start = fragData.pts_min;
-                    _hls.dispatchEvent(new HLSEvent(HLSEvent.PLAYLIST_DURATION_UPDATED, _levels[_hls.loadLevel].duration));
+                    _hls.dispatchEvent(new HLSEvent(HLSEvent.PLAYLIST_DURATION_UPDATED, fragLevel.duration));
                     if (fragData.tags.length) {
                         if (fragData.metadata_tag_injected == false) {
                             fragData.tags.unshift(_fragCurrent.getMetadataTag());

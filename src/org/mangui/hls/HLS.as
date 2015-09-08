@@ -10,6 +10,7 @@ package org.mangui.hls {
     import flash.net.NetStream;
     import flash.net.URLLoader;
     import flash.net.URLStream;
+    import org.mangui.hls.constant.HLSSeekStates;
     import org.mangui.hls.controller.AudioTrackController;
     import org.mangui.hls.controller.LevelController;
     import org.mangui.hls.event.HLSEvent;
@@ -135,8 +136,11 @@ package org.mangui.hls {
         /*  instant quality level switch (-1 for automatic level selection) */
         public function set currentLevel(level : int) : void {
             _manual_level = level;
-            _streamBuffer.flushBuffer();
-            _hlsNetStream.seek(position);
+            // don't flush and seek if never seeked or if end of stream
+            if(seekState != HLSSeekStates.IDLE) {
+                _streamBuffer.flushBuffer();
+                _hlsNetStream.seek(position);
+            }
         };
 
         /*  set quality level for next loaded fragment (-1 for automatic level selection) */
@@ -268,6 +272,14 @@ package org.mangui.hls {
         /* retrieve playback session stats */
         public function get stats() : Stats {
             return _statsHandler.stats;
+        }
+
+        /* start/restart playlist/fragment loading.
+           this is only effective if MANIFEST_PARSED event has been triggered already */
+        public function startLoad() : void {
+            if(levels && levels.length) {
+                this.dispatchEvent(new HLSEvent(HLSEvent.LEVEL_SWITCH, startLevel));
+            }
         }
     }
 }

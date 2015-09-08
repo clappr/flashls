@@ -172,10 +172,14 @@ get : return playback session stats
   fragAvgLatency : avg fragment load latency
   fragBuffered : total nb of buffered fragments
   fragBufferedBytes : total nb of buffered bytes
+  fragSkipped : total nb of skipped fragments
   fragChangedAuto : nb of frag played (loaded in auto mode)
   fragChangedManual : nb of frag played (loaded in manual mode)
 }
 ```
+
+#### ```hls.startLoad()```
+start/restart playlist/fragment loading. this is only effective if MANIFEST_PARSED event has been triggered
 
 ##Events
 
@@ -210,8 +214,12 @@ full list of Events is described below :
   	-  data: {url : manifest URL}
   - `HLSEvent.FRAGMENT_LOADED`  - triggered after a fragment has been succesfully loaded
   	-  data: { loadMetrics : HLSLoadMetrics }
+  - `HLSEvent.FRAGMENT_LOAD_EMERGENCY_ABORTED`  - triggered when fragment loading is aborted because of a sudden bandwidth drop
+    -  data: { loadMetrics : HLSLoadMetrics }
   - `HLSEvent.FRAGMENT_PLAYING`  - triggered when playback switches to a new fragment
   	-  data: { playMetrics : HLSPlayMetrics }
+  - `HLSEvent.FRAGMENT_SKIPPED`  - triggered when a fragment has been skipped because of fragment load I/O error
+    -  data: { duration : skipped fragment duration }
   - `HLSEvent.AUDIO_TRACKS_LIST_CHANGE`  - triggered when available audio tracks list changes
   	-  data: none
   - `HLSEvent.AUDIO_TRACK_SWITCH`  - triggered when switching to a different audio track
@@ -245,4 +253,6 @@ full list of Events is described below :
   - `HLSEvent.FPS_DROP_LEVEL_CAPPING` - triggered when FPS drop triggers auto level capping
     -  data: { level : max autolevel }
   - `HLSEvent.FPS_DROP_SMOOTH_LEVEL_SWITCH` - triggered when FPS drop triggers a smooth auto level down switching
+    -  data: none
+  - `HLSEvent.LIVE_LOADING_STALLED` - triggered when fragment loading stalls when playing back live content
     -  data: none
