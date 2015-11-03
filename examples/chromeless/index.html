@@ -222,6 +222,10 @@ header {
           <td>sliding</td>
           <td> <div id="sliding" style="display: inline;"></div> </td>
         </tr>
+        <tr>
+          <td>watched</td>
+          <td> <div id="watched" style="display: inline;"></div> </td>
+        </tr>
       </table>
     </div>
 
@@ -315,7 +319,7 @@ $(document).ready(function() {
 
     var manifest = decodeURIComponent(location.search.split('src=')[1]);
     if(manifest === 'undefined') {
-      manifest = 'http://www.streambox.fr/playlists/test_001/stream.m3u8';
+      manifest = 'http://www.streambox.fr/playlists/x36xhzz/x36xhzz.m3u8';
     }
     $('#streamURL').val(manifest);
 });
@@ -325,6 +329,7 @@ var events;
 var jsPingDate,flashPingDate, jsLoadDate, flashLoadDate;
 var lastSeekingIdx,lastFragPlayingIdx;
 var api;
+var levelNb;
 
 
 function loadStream(url) {
@@ -348,6 +353,7 @@ function load(url) {
   jsLoadDate = new Date();
   flashLoadDate = (jsLoadDate - jsPingDate )+ flashPingDate;
   lastSeekingIdx = lastFragPlayingIdx = undefined;
+  levelNb = 0;
   events = { url : url, date : jsLoadDate, load : [], buffer : [], video : []};
   api.load(url);
   appendLog("load URL " + url);
@@ -356,6 +362,7 @@ function load(url) {
   $('#bufferLength').html(0);
   $('#backBufferLength').html(0);
   $('#sliding').html(0);
+  $('#watched').html(0);
 }
 
 function toggleDebugLogs() {
@@ -443,6 +450,7 @@ var flashlsEvents = {
     appendLog("manifest loaded, playlist duration:"+ duration.toFixed(2));
     $('#currentDuration').html(duration.toFixed(2));
     showCanvas();
+    levelNb = levels.length;
     updateLevelInfo();
     api.play(-1);
     api.volume(10);
@@ -505,7 +513,8 @@ var flashlsEvents = {
       event.type =  'fragment main'
     }
     events.load.push(event);
-    document.getElementById("HlsStats").innerHTML = JSON.stringify(api.getStats(),null,"\t");
+    updateLevelInfo();
+    document.getElementById("HlsStats").innerHTML = JSON.stringify(sortObject(api.getStats()),null,"\t");
     refreshCanvas();
   },
   fragmentPlaying: function(playmetrics) {
@@ -521,6 +530,8 @@ var flashlsEvents = {
     events.video.push(event);
     lastFragPlayingIdx = events.video.length-1;
     updateLevelInfo();
+    document.getElementById("HlsStats").innerHTML = JSON.stringify(sortObject(api.getStats()),null,"\t");
+    refreshCanvas();
   },
   position: function(timemetrics) {
     $('#currentPosition').html(timemetrics.position.toFixed(2));
@@ -528,6 +539,7 @@ var flashlsEvents = {
     $('#bufferLength').html(timemetrics.buffer.toFixed(2));
     $('#backBufferLength').html(timemetrics.backbuffer.toFixed(2));
     $('#sliding').html(timemetrics.live_sliding_main.toFixed(2));
+    $('#watched').html(timemetrics.watched.toFixed(2));
     var event = { time : new Date() - jsLoadDate, buffer : Math.round(1000*timemetrics.buffer), pos: Math.round(1000*timemetrics.position)};
     var bufEvents = events.buffer, bufEventLen = bufEvents.length;
     if(bufEventLen > 1) {
@@ -612,6 +624,19 @@ var flashlsEvents = {
 };
 
 
+function sortObject(obj) {
+    if(typeof obj !== 'object')
+        return obj
+    var temp = {};
+    var keys = [];
+    for(var key in obj)
+        keys.push(key);
+    keys.sort();
+    for(var index in keys)
+        temp[keys[index]] = sortObject(obj[keys[index]]);
+    return temp;
+}
+
 function showCanvas()  {
     showMetrics();
     document.getElementById('buffered_c').style.display="block";
@@ -659,25 +684,31 @@ function updateBufferCanvas(position,duration,buffer, backbuffer) {
     var button_enabled  = 'btn-primary" ';
     var button_disabled = 'btn-success" ';
 
+    var autoLevel = api.getAutoLevel();
+    var autoLevelCapping = api.getAutoLevelCapping();
+    var currentLevel = api.getCurrentLevel();
+    var nextLevel = api.getNextLevel();
+    var loadLevel = api.getLoadLevel();
+
     var html1 = button_template;
-    if(api.getAutoLevel()) {
+    if(autoLevel) {
       html1 += button_enabled;
     } else {
       html1 += button_disabled;
     }
-    html1 += 'onclick="api.setCurrentLevel(-1)">auto</button>';
+    html1 += 'onclick="api.setCurrentLevel(-1);updateLevelInfo()">auto</button>';
 
 
     var html2 = button_template;
-    if(api.getAutoLevel()) {
+    if(autoLevel) {
       html2 += button_enabled;
     } else {
       html2 += button_disabled;
     }
-    html2 += 'onclick="api.setLoadLevel(-1)">auto</button>';
+    html2 += 'onclick="api.setLoadLevel(-1);updateLevelInfo()">auto</button>';
 
     var html3 = button_template;
-    if(api.getAutoLevelCapping() === -1) {
+    if(autoLevelCapping === -1) {
       html3 += button_enabled;
     } else {
       html3 += button_disabled;
@@ -685,33 +716,33 @@ function updateBufferCanvas(position,duration,buffer, backbuffer) {
     html3 += 'onclick="api.playerSetAutoLevelCapping(-1);updateLevelInfo()">none</button>';
 
     var html4 = button_template;
-    if(api.getAutoLevel()) {
+    if(autoLevel) {
       html4 += button_enabled;
     } else {
       html4 += button_disabled;
     }
-    html4 += 'onclick="api.setNextLevel(-1)">auto</button>';
+    html4 += 'onclick="api.setNextLevel(-1);updateLevelInfo()">auto</button>';
 
-    for (var i=0; i < api.getLevels().length; i++) {
+    for (var i=0; i < levelNb; i++) {
       html1 += button_template;
-      if(api.getCurrentLevel() === i) {
+      if(currentLevel === i) {
         html1 += button_enabled;
       } else {
         html1 += button_disabled;
       }
-      html1 += 'onclick="api.setCurrentLevel(' + i + ')">' + i + '</button>';
+      html1 += 'onclick="api.setCurrentLevel(' + i + ');updateLevelInfo()">' + i + '</button>';
 
 
       html2 += button_template;
-      if(api.getLoadLevel() === i) {
+      if(loadLevel === i) {
         html2 += button_enabled;
       } else {
         html2 += button_disabled;
       }
-      html2 += 'onclick="api.setLoadLevel(' + i + ')">' + i + '</button>';
+      html2 += 'onclick="api.setLoadLevel(' + i + ');updateLevelInfo()">' + i + '</button>';
 
       html3 += button_template;
-      if(api.getAutoLevelCapping() === i) {
+      if(autoLevelCapping === i) {
         html3 += button_enabled;
       } else {
         html3 += button_disabled;
@@ -719,12 +750,12 @@ function updateBufferCanvas(position,duration,buffer, backbuffer) {
       html3 += 'onclick="api.playerSetAutoLevelCapping(' + i + ');updateLevelInfo()">' + i + '</button>';
 
       html4 += button_template;
-      if(api.getNextLevel() === i) {
+      if(nextLevel === i) {
         html4 += button_enabled;
       } else {
         html4 += button_disabled;
       }
-      html4 += 'onclick="api.setNextLevel(' + i + ')">' + i + '</button>';
+      html4 += 'onclick="api.setNextLevel(' + i + ');updateLevelInfo()">' + i + '</button>';
     }
     $("#currentLevelControl").html(html1);
     $("#loadLevelControl").html(html2);

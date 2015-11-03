@@ -63,6 +63,7 @@ The plugin accepts several **optional** configuration options, such as:
   - `hls_debug2` (default false) - Toggle _verbose debug_ traces, outputted on JS console
   - `hls_minbufferlength` (default -1) - Minimum buffer length in _seconds_ that needs to be reached before playback can start (after seeking) or restart (in case of empty buffer)
     - If set to `-1` some heuristics based on past metrics are used to define an accurate value that should prevent buffer to stall
+  - `minBufferLengthCapping` (default -1) - minimum buffer length capping value (max value) if minBufferLength is set to -1
   - `hls_lowbufferlength` (default 3) - Low buffer threshold in _seconds_. When crossing down this threshold, HLS will switch to buffering state, usually the player will report this buffering state through a rotating icon. Playback will still continue.
   - `hls_maxbufferlength` (default 300) - Maximum buffer length in _seconds_ (0 means infinite buffering)
   - `hls_maxbackbufferlength` (default 30) - Maximum back buffer length in _seconds_ (0 means infinite back buffering). back buffer is seekable without redownloading segments.
@@ -77,13 +78,17 @@ The plugin accepts several **optional** configuration options, such as:
      - if 0.5, the closest to the middle bitrate will be selected and used first.
    - -1 : automatic start level selection, playback will start from level matching download bandwidth (determined from download of first segment)
    - -2 : playback will start from the first level appearing in Manifest (regardless of its bitrate)
+  - `hls_autoStartMaxDuration` (default -1) max fragment loading duration ( bw test + fragment loading) in automatic start level selection mode (in ms)
+     - If -1 : max duration not capped
+     - If greater than 0 : max duration is capped to given value. this will avoid long playback starting time. basically if set to 2000ms, and download bandwidth test took 1500ms, we only have 500ms left to load the proper fragment ... which is not enough ... this means that flashls will stick to level 0 in that case, even if download bandwidth would be enough to select an higher bitrate
   - `hls_seekfromlevel` (default -1) - If set to true, playback will start from lowest non-audio level after any seek operation. If set to false, playback will start from level used before seeking
    - from 0 to 1 : indicates the "normalized" preferred bitrate. As such,
      - if 0, lowest non-audio bitrate is used,
      - if 1, highest bitrate is used,
      - if 0.5, the closest to the middle bitrate will be selected and used first.
    - -1 : automatic seek level selection, keep level before seek.
-  - `hls_live_flushurlcache` (default false) - If set to true, Live playlist will be flushed from URL cache before reloading (this is to workaround some cache issues with some combination of Flash Player / IE version)
+  - `hls_flushliveurlcache` (default false) - If set to true, Live playlist will be flushed from URL cache before reloading (this is to workaround some cache issues with some combination of Flash Player / IE version)
+  - `hls_initiallivemanifestsize` (default 1) - Number of segments needed to start playback of Live stream.
   - `hls_seekmode`
     - "ACCURATE" - Seek to exact position
     - "KEYFRAME" - Seek to last keyframe before requested position

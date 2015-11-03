@@ -21,7 +21,6 @@ package org.mangui.chromeless {
     import org.mangui.hls.HLSSettings;
     import org.mangui.hls.model.AudioTrack;
     import org.mangui.hls.model.Level;
-    import org.mangui.hls.model.Stats;
     import org.mangui.hls.utils.JSURLLoader;
     import org.mangui.hls.utils.JSURLStream;
     import org.mangui.hls.utils.Log;
@@ -45,8 +44,10 @@ package org.mangui.chromeless {
         protected var _duration : Number;
         /** URL autoload feature */
         protected var _autoLoad : Boolean = false;
-
+        /* JS callback name */
         protected var _callbackName : String;
+        /* stats handler */
+        private var _statsHandler : StatsHandler;
 
         /** Initialization. **/
         public function ChromelessPlayer() {
@@ -364,8 +365,8 @@ package org.mangui.chromeless {
             return _hls.audioTrack;
         };
 
-        protected function _getStats() : Stats {
-            return _hls.stats;
+        protected function _getStats() : Object {
+            return _statsHandler.stats;
         };
 
         /** Javascript calls. **/
@@ -493,6 +494,10 @@ package org.mangui.chromeless {
             var available : Boolean = (event.availability == StageVideoAvailability.AVAILABLE);
             _hls = new HLS();
             _hls.stage = stage;
+            // set framerate to 60 fps
+            stage.frameRate = 60;
+            // set up stats handler
+            _statsHandler = new StatsHandler(_hls);
             _hls.addEventListener(HLSEvent.PLAYBACK_COMPLETE, _completeHandler);
             _hls.addEventListener(HLSEvent.ERROR, _errorHandler);
             _hls.addEventListener(HLSEvent.FRAGMENT_LOADED, _fragmentLoadedHandler);

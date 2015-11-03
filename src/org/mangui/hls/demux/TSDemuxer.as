@@ -11,6 +11,7 @@ package org.mangui.hls.demux {
     import flash.utils.Timer;
     import org.mangui.hls.flv.FLVTag;
     import org.mangui.hls.model.AudioTrack;
+    import by.blooddy.crypto.Base64;
 
     CONFIG::LOGGING {
         import org.mangui.hls.utils.Log;
@@ -57,6 +58,7 @@ package org.mangui.hls.demux {
         private var _callback_audioselect : Function;
         private var _callback_progress : Function;
         private var _callback_complete : Function;
+        private var _callback_error : Function;
         private var _callback_videometadata : Function;
         /* current audio PES */
         private var _curAudioPES : ByteArray;
@@ -101,7 +103,12 @@ package org.mangui.hls.demux {
         }
 
         /** Transmux the M2TS file into an FLV file. **/
-        public function TSDemuxer(callback_audioselect : Function, callback_progress : Function, callback_complete : Function, callback_videometadata : Function, audioOnly : Boolean) {
+        public function TSDemuxer(callback_audioselect : Function,
+                                  callback_progress : Function,
+                                  callback_complete : Function,
+                                  callback_error : Function,
+                                  callback_videometadata : Function,
+                                  audioOnly : Boolean) {
             _avcc = null;
             _curAudioPES = null;
             _curVideoPES = null;
@@ -112,6 +119,7 @@ package org.mangui.hls.demux {
             _callback_audioselect = callback_audioselect;
             _callback_progress = callback_progress;
             _callback_complete = callback_complete;
+            _callback_error = callback_error;
             _callback_videometadata = callback_videometadata;
             _pmtParsed = false;
             _unknownPIDFound = false;
@@ -154,6 +162,7 @@ package org.mangui.hls.demux {
             _avcc = null;
             _tags = new Vector.<FLVTag>();
             _timer.stop();
+            _timer.removeEventListener(TimerEvent.TIMER, _parseTimer);
         }
 
         public function notifycomplete() : void {
@@ -211,8 +220,9 @@ package org.mangui.hls.demux {
             var start_time : int = getTimer();
             /** Byte data to be read **/
             var data : ByteArray = getNextTSBuffer(_readPosition);
-            // dont spend more than 20ms demuxing TS packets to avoid loosing frames
-            while(data  != null && ((getTimer() - start_time) < 20)) {
+            // dont spend more than 10ms demuxing TS packets to avoid loosing frames
+            // if frame rate is 60fps, we have 1000/60 = 16.6ms budget total per frame
+            while(data  != null && ((getTimer() - start_time) < 10)) {
                 _parseTSPacket(data);
                 _readPosition+=PACKETSIZE;
                 if(data.bytesAvailable < PACKETSIZE) {
@@ -282,6 +292,7 @@ package org.mangui.hls.demux {
                         if (_curNalUnit && _curNalUnit.length) {
                             _curVideoTag.push(_curNalUnit, 0, _curNalUnit.length);
                         }
+                        _curVideoTag.build();
                         _tags.push(_curVideoTag);
                         _curVideoTag = null;
                         _curNalUnit = null;
@@ -366,6 +377,7 @@ package org.mangui.hls.demux {
                     Log.debug("TS/AAC: insert ADIF TAG");
                 }
                 adifTag.push(adif, 0, adif.length);
+                adifTag.build();
                 _tags.push(adifTag);
                 _adifTagInserted = true;
             }
@@ -378,6 +390,7 @@ package org.mangui.hls.demux {
                 stamp = Math.round(pes.pts + j * 1024 * 1000 / frame.rate);
                 var curAudioTag : FLVTag = new FLVTag(FLVTag.AAC_RAW, stamp, stamp, false);
                 curAudioTag.push(pes.data, frame.start, frame.length);
+                curAudioTag.build();
                 _tags.push(curAudioTag);
             }
             if (frame) {
@@ -411,6 +424,7 @@ package org.mangui.hls.demux {
             _audioPESfound=true;
             var tag : FLVTag = new FLVTag(FLVTag.MP3_RAW, pes.pts, pes.dts, false);
             tag.push(pes.data, pes.payload, pes.data.length - pes.payload);
+            tag.build();
             _tags.push(tag);
         };
 
@@ -463,6 +477,7 @@ package org.mangui.hls.demux {
                         }
                         // only push current tag if AVC HEADER has been pushed already
                         if(_avcc) {
+                            _curVideoTag.build();
                             _tags.push(_curVideoTag);
                         }
                         CONFIG::LOGGING {
@@ -496,6 +511,106 @@ package org.mangui.hls.demux {
                     pes.data.position = frame.start;
                     pes.data.readBytes(pps, 0, frame.length);
                     ppsvect.push(pps);
+                } else if (frame.type == 6) {
+
+                    // We already know it's 6, so skip first byte
+                    pes.data.position = frame.start + 1;
+
+                    // get the SEI payload type
+                    var payload_type : uint = pes.data.readUnsignedByte();
+
+                    if (payload_type == 4)
+                    {
+                        var payload_size : uint = 0;
+
+                        do {
+                            payload_size = pes.data.readUnsignedByte();
+                        }
+                        while(payload_size === 255)
+
+                        var country_code : uint = pes.data.readUnsignedByte();
+
+                        if (country_code == 181)
+                        {
+                            var provider_code : uint = pes.data.readUnsignedShort();
+
+                            if (provider_code == 49)
+                            {
+                                var user_structure : uint = pes.data.readUnsignedInt();
+
+                                if (user_structure == 0x47413934) // GA94
+                                {
+                                    var user_data_type : uint = pes.data.readUnsignedByte();
+
+                                    // CEA-608 wrapped in 708 ( user_data_type == 4 is raw 608, not handled yet )
+                                    if (user_data_type == 3)
+                                    {
+                                        // cc -- the first 8 bits are 1-Boolean-0 and the 5 bits for the number of CCs
+                                        var byte:uint = pes.data.readUnsignedByte();
+
+                                        // get the total number of cc_datas
+                                        var total:uint = 31 & byte;
+                                        var count:uint = 0;
+
+                                        // supposedly a flag to process the cc_datas or not
+                                        // isn't working for me, so i don't use it yet
+                                        var process:Boolean = !((64 & byte) == 0);
+
+                                        var size:uint = total * 3;
+
+                                        // em_data, do we need? It's not used for anything, but it's there, so i need to pull it out
+                                        var otherByte:uint = pes.data.readUnsignedByte();
+
+                                        if (pes.data.bytesAvailable >= size)
+                                        {
+                                            // ByteArray for onCaptionInfo event
+                                            var sei : ByteArray = new ByteArray();
+
+                                            // onCaptionInfo payloads need to know the size of the binary data
+                                            // there's two two bytes we just read, plus the cc_datas, which are 3 bytes each
+                                            sei.writeUnsignedInt(2+3*total);
+
+                                            // write those two bytes
+                                            sei.writeByte(byte);
+                                            sei.writeByte(otherByte);
+
+                                            // write the cc_datas
+                                            pes.data.readBytes(sei, 6, 3*total);
+
+                                            pes.data.position -= total * 3;
+
+                                            // onCaptionInfo expects Base64 data...
+                                            var sei_data:String = Base64.encode(sei);
+
+                                            var cc_data:Object = {
+                                                type: "708",
+                                                data: sei_data
+                                            };
+
+                                            // add a new FLVTag with the onCaptionInfo call
+                                            var tag:FLVTag = new FLVTag(FLVTag.METADATA, pes.pts, pes.pts, false);
+
+                                            var data : ByteArray = new ByteArray();
+                                            data.objectEncoding = ObjectEncoding.AMF0;
+                                            data.writeObject("onCaptionInfo");
+                                            data.objectEncoding = ObjectEncoding.AMF3;
+                                            data.writeByte(0x11);
+                                            data.writeObject(cc_data);
+                                            tag.push(data, 0, data.length);
+                                            tag.build();
+                                            _tags.push(tag);
+                                        }
+                                        else
+                                        {
+                                            CONFIG::LOGGING {
+                                                Log.info("not enough bytes!");
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
             // if both SPS and PPS have been found, build AVCC and push tag if needed
@@ -505,6 +620,7 @@ package org.mangui.hls.demux {
                 _avcc = avcc;
                 var avccTag : FLVTag = new FLVTag(FLVTag.AVC_HEADER, pes.pts, pes.dts, true);
                 avccTag.push(avcc, 0, avcc.length);
+                avccTag.build();
                 // Log.debug("TS:AVC:push AVC HEADER");
                 _tags.push(avccTag);
             }
@@ -591,6 +707,7 @@ package org.mangui.hls.demux {
             // then write the ByteArray
             data.writeObject(pespayload);
             tag.push(data, 0, data.length);
+            tag.build();
             _tags.push(tag);
         }
 
@@ -614,7 +731,10 @@ package org.mangui.hls.demux {
                     }
                     data.position = pos_end + 1;
                 } else {
-                    throw new Error("TS: Could not parse file: sync byte not found @ offset/len " + data.position + "/" + data.length);
+                    if(_callback_error != null) {
+                        _callback_error("TS: Could not parse file: sync byte not found @ offset/len " + data.position + "/" + data.length);
+                        return;
+                    }
                 }
             }
             todo--;
@@ -785,13 +905,11 @@ package org.mangui.hls.demux {
             data.position += 1;
             // get section length
             var sectionLen : uint = data.readUnsignedShort() & 0x3FF;
-            // Check the section length for a single PMT.
-            if (sectionLen > 13) {
-                throw new Error("TS: Multiple PMT entries are not supported.");
+            if (sectionLen >= 13) {
+                // Grab the first PMT ID
+                data.position += 7;
+                _pmtId = data.readUnsignedShort() & 8191;
             }
-            // Grab the PMT ID.
-            data.position += 7;
-            _pmtId = data.readUnsignedShort() & 8191;
             return 13 + pointerField;
         };
 
