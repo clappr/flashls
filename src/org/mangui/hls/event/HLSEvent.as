@@ -18,6 +18,8 @@ package org.mangui.hls.event {
         public static const MANIFEST_LOADED : String = "hlsEventManifestLoaded";
         /** Identifier for a level loading event  **/
         public static const LEVEL_LOADING : String = "hlsEventLevelLoading";
+        /** Identifier for a level loading aborted event  **/
+        public static const LEVEL_LOADING_ABORTED : String = "hlsEventLevelLoadingAborted";
         /** Identifier for a level loaded event  **/
         public static const LEVEL_LOADED : String = "hlsEventLevelLoaded";
         /** Identifier for a level switch event. **/
@@ -46,6 +48,8 @@ package org.mangui.hls.event {
         public static const TAGS_LOADED : String = "hlsEventTagsLoaded";
         /** Identifier when last fragment of playlist has been loaded **/
         public static const LAST_VOD_FRAGMENT_LOADED : String = "hlsEventLastFragmentLoaded";
+        /** Identifier for a playback warning event. **/
+        public static const WARNING : String = "hlsEventWarning";
         /** Identifier for a playback error event. **/
         public static const ERROR : String = "hlsEventError";
         /** Identifier for a playback media time change event. **/
@@ -106,6 +110,7 @@ package org.mangui.hls.event {
                     url = parameter as String;
                     break;
                 case ERROR:
+                case WARNING:
                     error = parameter as HLSError;
                     break;
                 case TAGS_LOADED:
@@ -130,6 +135,7 @@ package org.mangui.hls.event {
                     state = parameter as String;
                     break;
                 case LEVEL_LOADING:
+                case LEVEL_LOADING_ABORTED:
                 case LEVEL_SWITCH:
                 case AUDIO_LEVEL_LOADING:
                 case FPS_DROP:

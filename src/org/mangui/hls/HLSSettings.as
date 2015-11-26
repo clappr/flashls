@@ -159,6 +159,18 @@ package org.mangui.hls {
         public static var smoothAutoSwitchonFPSDrop : Boolean = true;
 
         /**
+         * switchDownOnLevelError
+         *
+         * if level loading fails, and if in auto mode, and we are not on lowest level
+         * don't report Level loading error straight-away, try to switch down first
+         *      true -  enabled
+         *      false - disabled
+         *
+         * Default is true
+         */
+        public static var switchDownOnLevelError : Boolean = true;
+
+        /**
          * seekMode
          *
          * Defines seek mode to one form available in HLSSeekMode class:
@@ -263,6 +275,16 @@ package org.mangui.hls {
          */
         public static var manifestLoadMaxRetryTimeout : Number = 64000;
 
+		/**
+		 * manifestRedundantLoadmaxRetry
+		 * 
+		 * max nb of looping over the redundant streams.
+		 *   >0  means looping over the stream array 2 or more times
+		 *    0  means looping exactly once (no retries) - default behaviour
+		 *   -1  means infinite retry
+		 */
+		public static var manifestRedundantLoadmaxRetry : int = 3;
+			
         /**
          * startFromBitrate
          *
