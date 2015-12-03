@@ -21,7 +21,7 @@ $FLEXPATH/bin/mxmlc ../src/io/clappr/Player.as \
     -o ../bin/release/HLSPlayer.swf \
     $OPT_RELEASE \
     -library-path+=../lib/blooddy_crypto.swc \
-    -target-player="14.0" \
+    -target-player="11.1" \
     -default-size 480 270 \
     -default-background-color=0x000000 \
     -default-frame-rate=60
@@ -33,7 +33,7 @@ $FLEXPATH/bin/mxmlc ../src/io/clappr/Player.as \
     -o ../bin/debug/HLSPlayer.swf \
     $OPT_DEBUG \
     -library-path+=../lib/blooddy_crypto.swc \
-    -target-player="14.0" \
+    -target-player="11.1" \
     -default-size 480 270 \
     -default-background-color=0x000000 \
     -default-frame-rate=60
