@@ -10,8 +10,8 @@ package io.clappr {
 
   public class Player extends ChromelessPlayer {
 
-    private static const CLAPPR_VERSION : String = "0.4.6";
-    private static const FLASHLS_VERSION : String = "0.4.4.10";
+    private static const CLAPPR_VERSION : String = "0.4.8";
+    private static const FLASHLS_VERSION : String = "0.4.4.12";
 
     public function Player() {
       super();
@@ -21,18 +21,41 @@ package io.clappr {
 
     override protected function _setupExternalCallers() : void {
       super._setupExternalCallers();
+      ExternalInterface.addCallback("playerSetAutoStartLoad", _setAutoStartLoad);
+      ExternalInterface.addCallback("playerSetCapLevelToStage", _setCapLevelToStage);
+      ExternalInterface.addCallback("playerSetMaxLevelCappingMode", _setMaxLevelCappingMode);
+      ExternalInterface.addCallback("playerSetMinBufferLength", _setMinBufferLength);
+      ExternalInterface.addCallback("playerSetMinBufferLengthCapping", _setMinBufferLengthCapping);
+      ExternalInterface.addCallback("playerSetMaxBufferLength", _setMaxBufferLength);
+      ExternalInterface.addCallback("playerSetMaxBackBufferLength", _setMaxBackBufferLength);
+      ExternalInterface.addCallback("playerSetLowBufferLength", _setLowBufferLength);
+      ExternalInterface.addCallback("playerSetMediaTimePeriod", _setMediaTimePeriod);
+      ExternalInterface.addCallback("playerSetFpsDroppedMonitoringPeriod", _setFpsDroppedMonitoringPeriod);
+      ExternalInterface.addCallback("playerSetFpsDroppedMonitoringThreshold", _setFpsDroppedMonitoringThreshold);
+      ExternalInterface.addCallback("playerSetCapLevelonFPSDrop", _setCapLevelonFPSDrop);
+      ExternalInterface.addCallback("playerSetSmoothAutoSwitchonFPSDrop", _setSmoothAutoSwitchonFPSDrop);
+      ExternalInterface.addCallback("playerSetSwitchDownOnLevelError", _setSwitchDownOnLevelError);
+      ExternalInterface.addCallback("playerSetSeekMode", _setSeekMode);
       ExternalInterface.addCallback("playerSetKeyLoadMaxRetry", _setKeyLoadMaxRetry);
       ExternalInterface.addCallback("playerSetKeyLoadMaxRetryTimeout", _setKeyLoadMaxRetryTimeout);
       ExternalInterface.addCallback("playerSetFragmentLoadMaxRetry", _setFragmentLoadMaxRetry);
       ExternalInterface.addCallback("playerSetFragmentLoadMaxRetryTimeout", _setFragmentLoadMaxRetryTimeout);
       ExternalInterface.addCallback("playerSetFragmentLoadSkipAfterMaxRetry", _setFragmentLoadSkipAfterMaxRetry);
-      ExternalInterface.addCallback("playerSetLogInfo", _setLogInfo);
-      ExternalInterface.addCallback("playerSetSeekMode", _setSeekMode);
+      ExternalInterface.addCallback("playerSetFlushLiveURLCache", _setFlushLiveURLCache);
+      ExternalInterface.addCallback("playerSetInitialLiveManifestSize", _setInitialLiveManifestSize);
+      ExternalInterface.addCallback("playerSetManifestLoadMaxRetry", _setManifestLoadMaxRetry);
+      ExternalInterface.addCallback("playerSetManifestLoadMaxRetryTimeout", _setManifestLoadMaxRetryTimeout);
+      ExternalInterface.addCallback("playerSetManifestRedundantLoadmaxRetry", _setManifestRedundantLoadmaxRetry);
       ExternalInterface.addCallback("playerSetStartFromBitrate", _setStartFromBitrate);
-      ExternalInterface.addCallback("playerSetFpsDroppedMonitoringPeriod", _setFpsDroppedMonitoringPeriod);
-      ExternalInterface.addCallback("playerSetFpsDroppedMonitoringThreshold", _setFpsDroppedMonitoringThreshold);
-      ExternalInterface.addCallback("playerSetCapLevelonFPSDrop", _setCapLevelonFPSDrop);
-      ExternalInterface.addCallback("playerSetSmoothAutoSwitchonFPSDrop", _setSmoothAutoSwitchonFPSDrop);
+      ExternalInterface.addCallback("playerSetStartFromLevel", _setStartFromLevel);
+      ExternalInterface.addCallback("playerSetAutoStartMaxDuration", _setAutoStartMaxDuration);
+      ExternalInterface.addCallback("playerSetSeekFromLevel", _setSeekFromLevel);
+      ExternalInterface.addCallback("playerSetUseHardwareVideoDecoder", _setUseHardwareVideoDecoder);
+      ExternalInterface.addCallback("playerSetLogInfo", _setLogInfo);
+      ExternalInterface.addCallback("playerSetLogDebug", _setLogDebug);
+      ExternalInterface.addCallback("playerSetLogDebug2", _setLogDebug2);
+      ExternalInterface.addCallback("playerSetLogWarn", _setLogWarn);
+      ExternalInterface.addCallback("playerSetLogError", _setLogError);
     }
 
     override protected function _setupExternalGetters() : void {
@@ -60,6 +83,66 @@ package io.clappr {
       return FLASHLS_VERSION;
     }
 
+    private function _setAutoStartLoad(autoStartLoad: Boolean) : void {
+      HLSSettings.autoStartLoad = autoStartLoad;
+    }
+
+    private function _setCapLevelToStage(capLevelToStage: Boolean) : void {
+      HLSSettings.capLevelToStage = capLevelToStage;
+    }
+
+    private function _setMaxLevelCappingMode(maxLevelCappingMode: String) : void {
+      HLSSettings.maxLevelCappingMode = maxLevelCappingMode;
+    }
+
+    private function _setMinBufferLength(minBufferLength: Number) : void {
+      HLSSettings.minBufferLength = minBufferLength;
+    }
+
+    private function _setMinBufferLengthCapping(minBufferLengthCapping: Number) : void {
+      HLSSettings.minBufferLengthCapping = minBufferLengthCapping;
+    }
+
+    private function _setMaxBufferLength(maxBufferLength: Number) : void {
+      HLSSettings.maxBufferLength = maxBufferLength;
+    }
+
+    private function _setMaxBackBufferLength(maxBackBufferLength: Number) : void {
+      HLSSettings.maxBackBufferLength = maxBackBufferLength;
+    }
+
+    private function _setLowBufferLength(lowBufferLength: Number) : void {
+      HLSSettings.lowBufferLength = lowBufferLength;
+    }
+
+    private function _setMediaTimePeriod(mediaTimePeriod: int) : void {
+      HLSSettings.mediaTimePeriod = mediaTimePeriod;
+    }
+
+    private function _setFpsDroppedMonitoringPeriod(fpsDroppedMonitoringPeriod: int) : void {
+      HLSSettings.fpsDroppedMonitoringPeriod = fpsDroppedMonitoringPeriod;
+    }
+
+    private function _setFpsDroppedMonitoringThreshold(fpsDroppedMonitoringThreshold: Number) : void {
+      HLSSettings.fpsDroppedMonitoringThreshold = fpsDroppedMonitoringThreshold;
+    }
+
+    private function _setCapLevelonFPSDrop(capLevelonFPSDrop: Boolean) : void {
+      HLSSettings.capLevelonFPSDrop = capLevelonFPSDrop;
+    }
+
+    private function _setSmoothAutoSwitchonFPSDrop(smoothAutoSwitchonFPSDrop: Boolean) : void {
+      HLSSettings.smoothAutoSwitchonFPSDrop = smoothAutoSwitchonFPSDrop;
+    }
+
+    private function _setSwitchDownOnLevelError(switchDownOnLevelError: Boolean) : void {
+      HLSSettings.switchDownOnLevelError = switchDownOnLevelError;
+    }
+
+    private function _setSeekMode(seekMode: String) : void {
+      HLSSettings.seekMode = seekMode;
+    }
+
     private function _setKeyLoadMaxRetry(keyLoadMaxRetry: int) : void {
       HLSSettings.keyLoadMaxRetry = keyLoadMaxRetry;
     }
@@ -80,32 +163,64 @@ package io.clappr {
       HLSSettings.fragmentLoadSkipAfterMaxRetry = fragmentLoadSkipAfterMaxRetry;
     }
 
-    private function _setLogInfo(logInfo: Boolean) : void {
-      HLSSettings.logInfo = logInfo;
+    private function _setFlushLiveURLCache(flushLiveURLCache: Boolean) : void {
+      HLSSettings.flushLiveURLCache = flushLiveURLCache;
     }
 
-    private function _setSeekMode(seekMode: String) : void {
-      HLSSettings.seekMode = seekMode;
+    private function _setInitialLiveManifestSize(initialLiveManifestSize: uint) : void {
+      HLSSettings.initialLiveManifestSize = initialLiveManifestSize;
+    }
+
+    private function _setManifestLoadMaxRetry(manifestLoadMaxRetry: int) : void {
+      HLSSettings.manifestLoadMaxRetry = manifestLoadMaxRetry;
+    }
+
+    private function _setManifestLoadMaxRetryTimeout(manifestLoadMaxRetryTimeout: Number) : void {
+      HLSSettings.manifestLoadMaxRetryTimeout = manifestLoadMaxRetryTimeout;
+    }
+
+    private function _setManifestRedundantLoadmaxRetry(manifestRedundantLoadmaxRetry: int) : void {
+      HLSSettings.manifestRedundantLoadmaxRetry = manifestRedundantLoadmaxRetry;
     }
 
     private function _setStartFromBitrate(startFromBitrate: Number) : void {
       HLSSettings.startFromBitrate = startFromBitrate;
     }
 
-    private function _setFpsDroppedMonitoringPeriod(fpsDroppedMonitoringPeriod: int) : void {
-      HLSSettings.fpsDroppedMonitoringPeriod = fpsDroppedMonitoringPeriod;
+    private function _setStartFromLevel(startFromLevel: Number) : void {
+      HLSSettings.startFromLevel = startFromLevel;
     }
 
-    private function _setFpsDroppedMonitoringThreshold(fpsDroppedMonitoringThreshold: Number) : void {
-      HLSSettings.fpsDroppedMonitoringThreshold = fpsDroppedMonitoringThreshold;
+    private function _setAutoStartMaxDuration(autoStartMaxDuration: Number) : void {
+      HLSSettings.autoStartMaxDuration = autoStartMaxDuration;
     }
 
-    private function _setCapLevelonFPSDrop(capLevelonFPSDrop: Boolean) : void {
-      HLSSettings.capLevelonFPSDrop = capLevelonFPSDrop;
+    private function _setSeekFromLevel(seekFromLevel: Number) : void {
+      HLSSettings.seekFromLevel = seekFromLevel;
     }
 
-    private function _setSmoothAutoSwitchonFPSDrop(smoothAutoSwitchonFPSDrop: Boolean) : void {
-      HLSSettings.smoothAutoSwitchonFPSDrop = smoothAutoSwitchonFPSDrop;
+    private function _setUseHardwareVideoDecoder(useHardwareVideoDecoder: Boolean) : void {
+      HLSSettings.useHardwareVideoDecoder = useHardwareVideoDecoder;
+    }
+
+    private function _setLogInfo(logInfo: Boolean) : void {
+      HLSSettings.logInfo = logInfo;
+    }
+
+    private function _setLogDebug(logDebug: Boolean) : void {
+      HLSSettings.logDebug = logDebug;
+    }
+
+    private function _setLogDebug2(logDebug2: Boolean) : void {
+      HLSSettings.logDebug2 = logDebug2;
+    }
+
+    private function _setLogWarn(logWarn: Boolean) : void {
+      HLSSettings.logWarn = logWarn;
+    }
+
+    private function _setLogError(logError: Boolean) : void {
+      HLSSettings.logError = logError;
     }
   }
 }
