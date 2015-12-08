@@ -10,8 +10,8 @@ package io.clappr {
 
   public class Player extends ChromelessPlayer {
 
-    private static const CLAPPR_VERSION : String = "0.4.8";
-    private static const FLASHLS_VERSION : String = "0.4.4.12";
+    private static const CLAPPR_VERSION : String = "0.4.9";
+    private static const FLASHLS_VERSION : String = "0.4.4.16";
 
     public function Player() {
       super();
@@ -50,7 +50,10 @@ package io.clappr {
       ExternalInterface.addCallback("playerSetStartFromLevel", _setStartFromLevel);
       ExternalInterface.addCallback("playerSetAutoStartMaxDuration", _setAutoStartMaxDuration);
       ExternalInterface.addCallback("playerSetSeekFromLevel", _setSeekFromLevel);
+      ExternalInterface.addCallback("playerSetUseHardwareVideoDecoder", _setuseHardwareVideoDecoder);
       ExternalInterface.addCallback("playerSetLogInfo", _setLogInfo);
+      ExternalInterface.addCallback("playerSetLogDebug", _setlogDebug);
+      ExternalInterface.addCallback("playerSetLogDebug2", _setlogDebug2);
       ExternalInterface.addCallback("playerSetLogWarn", _setLogWarn);
       ExternalInterface.addCallback("playerSetLogError", _setLogError);
     }
@@ -196,8 +199,20 @@ package io.clappr {
       HLSSettings.seekFromLevel = seekFromLevel;
     }
 
+    private function _setuseHardwareVideoDecoder(useHardwareVideoDecoder: Boolean) : void {
+      HLSSettings.useHardwareVideoDecoder = useHardwareVideoDecoder;
+    }
+
     private function _setLogInfo(logInfo: Boolean) : void {
       HLSSettings.logInfo = logInfo;
+    }
+
+    private function _setlogDebug(logDebug: Boolean) : void {
+      HLSSettings.logDebug = logDebug;
+    }
+
+    private function _setlogDebug2(logDebug2: Boolean) : void {
+      HLSSettings.logDebug2 = logDebug2;
     }
 
     private function _setLogWarn(logWarn: Boolean) : void {
