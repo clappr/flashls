@@ -50,10 +50,7 @@ package io.clappr {
       ExternalInterface.addCallback("playerSetStartFromLevel", _setStartFromLevel);
       ExternalInterface.addCallback("playerSetAutoStartMaxDuration", _setAutoStartMaxDuration);
       ExternalInterface.addCallback("playerSetSeekFromLevel", _setSeekFromLevel);
-      ExternalInterface.addCallback("playerSetUseHardwareVideoDecoder", _setUseHardwareVideoDecoder);
       ExternalInterface.addCallback("playerSetLogInfo", _setLogInfo);
-      ExternalInterface.addCallback("playerSetLogDebug", _setLogDebug);
-      ExternalInterface.addCallback("playerSetLogDebug2", _setLogDebug2);
       ExternalInterface.addCallback("playerSetLogWarn", _setLogWarn);
       ExternalInterface.addCallback("playerSetLogError", _setLogError);
     }
@@ -199,20 +196,8 @@ package io.clappr {
       HLSSettings.seekFromLevel = seekFromLevel;
     }
 
-    private function _setUseHardwareVideoDecoder(useHardwareVideoDecoder: Boolean) : void {
-      HLSSettings.useHardwareVideoDecoder = useHardwareVideoDecoder;
-    }
-
     private function _setLogInfo(logInfo: Boolean) : void {
       HLSSettings.logInfo = logInfo;
-    }
-
-    private function _setLogDebug(logDebug: Boolean) : void {
-      HLSSettings.logDebug = logDebug;
-    }
-
-    private function _setLogDebug2(logDebug2: Boolean) : void {
-      HLSSettings.logDebug2 = logDebug2;
     }
 
     private function _setLogWarn(logWarn: Boolean) : void {
