@@ -41,6 +41,7 @@ package io.clappr {
       ExternalInterface.addCallback("playerSetFragmentLoadMaxRetry", _setFragmentLoadMaxRetry);
       ExternalInterface.addCallback("playerSetFragmentLoadMaxRetryTimeout", _setFragmentLoadMaxRetryTimeout);
       ExternalInterface.addCallback("playerSetFragmentLoadSkipAfterMaxRetry", _setFragmentLoadSkipAfterMaxRetry);
+      ExternalInterface.addCallback("playerSetMaxSkippedFragments", _setMaxSkippedFragments);
       ExternalInterface.addCallback("playerSetFlushLiveURLCache", _setFlushLiveURLCache);
       ExternalInterface.addCallback("playerSetInitialLiveManifestSize", _setInitialLiveManifestSize);
       ExternalInterface.addCallback("playerSetManifestLoadMaxRetry", _setManifestLoadMaxRetry);
@@ -161,6 +162,10 @@ package io.clappr {
 
     private function _setFragmentLoadSkipAfterMaxRetry(fragmentLoadSkipAfterMaxRetry: Boolean) : void {
       HLSSettings.fragmentLoadSkipAfterMaxRetry = fragmentLoadSkipAfterMaxRetry;
+    }
+
+    private function _setMaxSkippedFragments(maxSkippedFragments: int) : void {
+      HLSSettings.maxSkippedFragments = maxSkippedFragments;
     }
 
     private function _setFlushLiveURLCache(flushLiveURLCache: Boolean) : void {
