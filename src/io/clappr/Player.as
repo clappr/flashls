@@ -10,8 +10,8 @@ package io.clappr {
 
   public class Player extends ChromelessPlayer {
 
-    private static const CLAPPR_VERSION : String = "0.4.9";
-    private static const FLASHLS_VERSION : String = "0.4.4.16";
+    private static const CLAPPR_VERSION : String = "0.4.10";
+    private static const FLASHLS_VERSION : String = "0.4.4.17";
 
     public function Player() {
       super();
@@ -41,6 +41,7 @@ package io.clappr {
       ExternalInterface.addCallback("playerSetFragmentLoadMaxRetry", _setFragmentLoadMaxRetry);
       ExternalInterface.addCallback("playerSetFragmentLoadMaxRetryTimeout", _setFragmentLoadMaxRetryTimeout);
       ExternalInterface.addCallback("playerSetFragmentLoadSkipAfterMaxRetry", _setFragmentLoadSkipAfterMaxRetry);
+      ExternalInterface.addCallback("playerSetMaxSkippedFragments", _setMaxSkippedFragments);
       ExternalInterface.addCallback("playerSetFlushLiveURLCache", _setFlushLiveURLCache);
       ExternalInterface.addCallback("playerSetInitialLiveManifestSize", _setInitialLiveManifestSize);
       ExternalInterface.addCallback("playerSetManifestLoadMaxRetry", _setManifestLoadMaxRetry);
@@ -161,6 +162,10 @@ package io.clappr {
 
     private function _setFragmentLoadSkipAfterMaxRetry(fragmentLoadSkipAfterMaxRetry: Boolean) : void {
       HLSSettings.fragmentLoadSkipAfterMaxRetry = fragmentLoadSkipAfterMaxRetry;
+    }
+
+    private function _setMaxSkippedFragments(maxSkippedFragments: int) : void {
+      HLSSettings.maxSkippedFragments = maxSkippedFragments;
     }
 
     private function _setFlushLiveURLCache(flushLiveURLCache: Boolean) : void {
